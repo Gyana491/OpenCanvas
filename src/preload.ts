@@ -13,8 +13,8 @@ window.addEventListener("message", (event) => {
 contextBridge.exposeInMainWorld('electron', {
   createWorkflow: (name?: string) => ipcRenderer.invoke('workflow:create', name),
 
-  saveWorkflow: (id: string, nodes: any[], edges: any[], viewport?: any) =>
-    ipcRenderer.invoke('workflow:save', id, nodes, edges, viewport),
+  saveWorkflow: (id: string, nodes: any[], edges: any[], viewport?: any, thumbnail?: ArrayBuffer) =>
+    ipcRenderer.invoke('workflow:save', id, nodes, edges, viewport, thumbnail),
 
   loadWorkflow: (id: string) => ipcRenderer.invoke('workflow:load', id),
 
@@ -30,4 +30,8 @@ contextBridge.exposeInMainWorld('electron', {
     assetType: 'image' | 'video' | 'file',
     mimeType?: string
   ) => ipcRenderer.invoke('workflow:save-asset', workflowId, nodeId, fileBuffer, fileName, assetType, mimeType),
+
+  exportProject: (id: string) => ipcRenderer.invoke('workflow:export', id),
+
+  importProject: (zipBuffer: Buffer) => ipcRenderer.invoke('workflow:import', zipBuffer),
 });

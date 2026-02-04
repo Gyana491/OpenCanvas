@@ -1,6 +1,6 @@
 /// <reference types="@electron-forge/plugin-vite/forge-vite-env" />
 
-import { app, BrowserWindow } from "electron";
+import { app, BrowserWindow, protocol, net } from "electron";
 import path from "path";
 import {
   installExtension,
@@ -10,8 +10,7 @@ import { ipcMain } from "electron/main";
 import { ipcContext } from "@/ipc/context";
 import { IPC_CHANNELS } from "./constants";
 import { updateElectronApp, UpdateSourceType } from "update-electron-app";
-import { initDatabase, runMigrations } from "./db/db";
-import { initStorage } from "./db/storage";
+import { initStorage } from "./services/file-storage-service";
 import { registerWorkflowHandlers } from "./ipc/workflow-handlers";
 
 const inDevelopment = process.env.NODE_ENV === "development";
@@ -32,6 +31,9 @@ function createWindow() {
     title: "OpenCanvas",
   });
   ipcContext.setMainWindow(mainWindow);
+
+  //Enable Developer Tools
+  mainWindow.webContents.openDevTools();
 
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
@@ -71,36 +73,97 @@ async function setupORPC() {
   });
 }
 
+function registerProtocol() {
+  protocol.handle("opencanvas", (request) => {
+    const url = request.url.replace("opencanvas://", "");
+    // url format: opencanvas://<workflowId>/assets/<filename>
+    // but the request.url comes as opencanvas://<host>/<path>
+    // actually, normally schemes like opencanvas://hostname/path
+    // We will use opencanvas://store/workflowId/assets/filename for clarity or just opencanvas://workflowId/
+
+    // Let's assume usage: opencanvas://<workflowId>/assets/<filename>
+    // request.url will be opencanvas://<workflowId>/assets/<filename>
+
+    try {
+      // Decode URL to handle spaces etc
+      const decodedUrl = decodeURIComponent(url);
+
+      // We expect the first segment to be the workflow ID
+      // But depending on how URL is parsed, it might be tricky.
+      // Let's handle it manually.
+
+      // Remove trailing slash if any
+      const cleanPath = decodedUrl.startsWith('/') ? decodedUrl.slice(1) : decodedUrl;
+      const parts = cleanPath.split('/');
+
+      // Expected: [workflowId, 'assets', filename] OR [workflowId, 'thumbnail']
+      if (parts.length === 2 && parts[1] === 'thumbnail') {
+        // Serve thumbnail
+        const workflowId = parts[0];
+        const homeDir = app.getPath('home');
+        const filePath = path.join(homeDir, '.opencanvas', `opencanvas_${workflowId}`, `opencanvas_thumbnail_${workflowId}.png`);
+        return net.fetch(`file://${filePath}`);
+      }
+
+      if (parts.length < 3 || parts[1] !== 'assets') {
+        return new Response("Invalid URL format", { status: 400 });
+      }
+
+      const workflowId = parts[0];
+      const filename = parts.slice(2).join('/'); // In case filename has subdirs, though we flat keys
+
+      const homeDir = app.getPath('home');
+      const filePath = path.join(homeDir, '.opencanvas', `opencanvas_${workflowId}`, 'assets', filename);
+
+      return net.fetch(`file://${filePath}`);
+    } catch (error) {
+      console.error("Protocol error:", error);
+      return new Response("Internal Server Error", { status: 500 });
+    }
+  });
+}
+
 async function setupDatabase() {
   try {
-    console.log('[Main] Initializing database and storage...');
+    console.log('[Main] Initializing file storage...');
 
     // Initialize storage directories
     initStorage();
 
-    // Initialize database connection
-    initDatabase();
-
-    // Run migrations
-    await runMigrations();
-
     // Register workflow IPC handlers
     registerWorkflowHandlers();
 
-    console.log('[Main] Database and storage initialized successfully');
+    console.log('[Main] File storage initialized successfully');
   } catch (error) {
-    console.error('[Main] Failed to initialize database:', error);
+    console.error('[Main] Failed to initialize storage:', error);
     throw error;
   }
 }
 
+// Register privileges for the custom protocol
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: 'opencanvas',
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      corsEnabled: true,
+      bypassCSP: true
+    }
+  }
+])
+
 app
   .whenReady()
-  .then(setupDatabase)
-  .then(createWindow)
-  .then(installExtensions)
-  .then(checkForUpdates)
-  .then(setupORPC);
+  .then(() => {
+    registerProtocol();
+    setupDatabase();
+    createWindow();
+    installExtensions();
+    checkForUpdates();
+    setupORPC();
+  });
 
 //osX only
 app.on("window-all-closed", () => {

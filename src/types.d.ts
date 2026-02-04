@@ -21,7 +21,8 @@ declare global {
                 id: string,
                 nodes: any[],
                 edges: any[],
-                viewport?: { x: number; y: number; zoom: number }
+                viewport?: { x: number; y: number; zoom: number },
+                thumbnail?: ArrayBuffer
             ) => Promise<{
                 success: boolean
                 error?: string

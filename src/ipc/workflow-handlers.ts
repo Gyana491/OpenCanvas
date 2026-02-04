@@ -27,9 +27,9 @@ export function registerWorkflowHandlers() {
     // Save workflow state
     ipcMain.handle(
         'workflow:save',
-        async (_event, id: string, nodes: Node[], edges: Edge[], viewport?: Viewport) => {
+        async (_event, id: string, nodes: Node[], edges: Edge[], viewport?: Viewport, thumbnail?: Buffer | ArrayBuffer) => {
             try {
-                await saveWorkflow(id, nodes, edges, viewport)
+                await saveWorkflow(id, nodes, edges, viewport, thumbnail)
                 return { success: true }
             } catch (error) {
                 console.error('[IPC] workflow:save error:', error)
@@ -75,22 +75,28 @@ export function registerWorkflowHandlers() {
     })
 
     // Save asset (image/video file)
+    // Save asset (image/video file)
     ipcMain.handle(
         'workflow:save-asset',
         async (
             _event,
             workflowId: string,
             nodeId: string,
-            fileBuffer: Buffer,
+            fileBuffer: Buffer | ArrayBuffer, // Allow ArrayBuffer
             fileName: string,
             assetType: 'image' | 'video' | 'file',
             mimeType?: string
         ) => {
             try {
+                // Ensure we have a Node Buffer
+                // Cast to any to handle both Buffer and ArrayBuffer inputs gracefully
+                // as Buffer.from supports both but TS definitions can be strict
+                const buffer = Buffer.from(fileBuffer as any)
+
                 const filePath = await saveNodeAsset(
                     workflowId,
                     nodeId,
-                    fileBuffer,
+                    buffer,
                     fileName,
                     assetType,
                     mimeType
@@ -102,6 +108,30 @@ export function registerWorkflowHandlers() {
             }
         }
     )
+
+    // Export workflow project
+    ipcMain.handle('workflow:export', async (_event, id: string) => {
+        try {
+            const { exportProject } = await import('../services/workflow-service')
+            const buffer = await exportProject(id)
+            return { success: true, data: buffer }
+        } catch (error) {
+            console.error('[IPC] workflow:export error:', error)
+            return { success: false, error: (error as Error).message }
+        }
+    })
+
+    // Import workflow project
+    ipcMain.handle('workflow:import', async (_event, zipBuffer: Buffer) => {
+        try {
+            const { importProject } = await import('../services/workflow-service')
+            const workflow = await importProject(zipBuffer)
+            return { success: true, data: workflow }
+        } catch (error) {
+            console.error('[IPC] workflow:import error:', error)
+            return { success: false, error: (error as Error).message }
+        }
+    })
 
     console.log('[IPC] Workflow handlers registered')
 }

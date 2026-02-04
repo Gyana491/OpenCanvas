@@ -21,6 +21,9 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { Activity } from 'lucide-react'
+import { toast } from 'sonner'
+import { toPng } from 'html-to-image'
+
 
 import { EditorSidebar } from './editor-sidebar'
 import { NodeLibrary } from './node-library'
@@ -255,9 +258,9 @@ function WorkflowEditorInner() {
             console.log('[Workflow Editor] Creation already in progress, skipping...')
             return
           }
-          
+
           creationInProgressRef.current = true
-          
+
           // Create new workflow
           const response = await window.electron.createWorkflow()
           if (response.success && response.data) {
@@ -305,6 +308,27 @@ function WorkflowEditorInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Helper to sanitize nodes for saving (remove functions)
+  const getSerializableGraph = useCallback((nodes: Node[], edges: Edge[]) => {
+    const serializableNodes = nodes.map(node => {
+      const { data, ...rest } = node
+      // Create a clean data object without functions
+      const cleanData = Object.entries(data).reduce((acc, [key, value]) => {
+        if (typeof value !== 'function') {
+          acc[key] = value
+        }
+        return acc
+      }, {} as Record<string, any>)
+
+      return {
+        ...rest,
+        data: cleanData
+      }
+    })
+
+    return { nodes: serializableNodes, edges }
+  }, [])
+
   // Auto-save workflow when nodes, edges, or viewport changes
   useEffect(() => {
     if (isLoading || !window.electron || !currentWorkflowId) {
@@ -320,13 +344,15 @@ function WorkflowEditorInner() {
     autoSaveTimerRef.current = setTimeout(async () => {
       try {
         const viewport = getViewport()
+        const { nodes: safeNodes, edges: safeEdges } = getSerializableGraph(nodes, edges)
+
         console.log('[Workflow Editor] Auto-saving workflow:', currentWorkflowId, {
-          nodes: nodes.length,
-          edges: edges.length,
+          nodes: safeNodes.length,
+          edges: safeEdges.length,
           viewport
         })
-        
-        const response = await window.electron.saveWorkflow(currentWorkflowId, nodes, edges, viewport)
+
+        const response = await window.electron.saveWorkflow(currentWorkflowId, safeNodes, safeEdges, viewport)
         if (response.success) {
           console.log('[Workflow Editor] Auto-saved workflow:', currentWorkflowId)
         } else {
@@ -343,7 +369,7 @@ function WorkflowEditorInner() {
         clearTimeout(autoSaveTimerRef.current)
       }
     }
-  }, [nodes, edges, currentWorkflowId, isLoading, getViewport])
+  }, [nodes, edges, currentWorkflowId, isLoading, getViewport, getSerializableGraph])
 
   const toggleAnimation = useCallback(() => {
     setIsAnimated((prev) => !prev)
@@ -660,12 +686,59 @@ function WorkflowEditorInner() {
     setNodes((nds) => [...nds, newNode])
   }, [setNodes, updateNodeData])
 
+  const handleManualSave = useCallback(async () => {
+    if (!currentWorkflowId || !window.electron) return
+
+    try {
+      const viewport = getViewport()
+      const { nodes: safeNodes, edges: safeEdges } = getSerializableGraph(nodes, edges)
+
+      // Capture thumbnail
+      let thumbnailBuffer: ArrayBuffer | undefined
+      try {
+        const flowElement = document.querySelector('.react-flow__viewport') as HTMLElement
+        if (flowElement) {
+          const dataUrl = await toPng(flowElement, {
+            backgroundColor: '#fff',
+            width: flowElement.offsetWidth,
+            height: flowElement.offsetHeight,
+            style: {
+              width: `${flowElement.offsetWidth}px`,
+              height: `${flowElement.offsetHeight}px`,
+              transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})`
+            }
+          })
+
+          // Convert base64 to ArrayBuffer
+          const response = await fetch(dataUrl)
+          thumbnailBuffer = await response.arrayBuffer()
+        }
+      } catch (err) {
+        console.error('Failed to generate thumbnail:', err)
+        // Proceed without thumbnail
+      }
+
+      const response = await window.electron.saveWorkflow(currentWorkflowId, safeNodes, safeEdges, viewport, thumbnailBuffer)
+      if (response.success) {
+        toast.success('Workflow saved successfully')
+        console.log('[Workflow Editor] Manually saved workflow:', currentWorkflowId)
+        // Update URL if it was a new workflow and ID changed (though createWorkflow handles that)
+      } else {
+        toast.error(`Failed to save workflow: ${response.error}`)
+      }
+    } catch (error) {
+      console.error('[Workflow Editor] Manual save error:', error)
+      toast.error('An error occurred while saving')
+    }
+  }, [currentWorkflowId, getViewport, getSerializableGraph, nodes, edges])
+
   return (
     <div className="flex h-screen w-full bg-background">
       {/* Minimal left sidebar with logo, search, layers - always visible */}
       <EditorSidebar
         onSearchClick={() => setIsLibraryOpen(true)}
         onLayersClick={() => setIsLibraryOpen(!isLibraryOpen)}
+        onSave={handleManualSave}
         isLibraryOpen={isLibraryOpen}
       />
 

@@ -1,12 +1,14 @@
 "use client"
 
-import { memo, useRef, useState } from 'react'
+import { memo, useRef, useState, useEffect } from 'react'
+import { useParams } from '@tanstack/react-router'
 import { Handle, Position, type NodeProps } from '@xyflow/react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Image as ImageIcon, Upload, MoreVertical, X } from 'lucide-react'
+import { Image as ImageIcon, Upload, MoreVertical, X, Loader2 } from 'lucide-react'
 
 export const ImageUploadNode = memo(({ data, selected, id }: NodeProps) => {
+  const { id: workflowId } = useParams({ from: '/editor/$id' })
   const outputs = (data?.outputs || []) as Array<{
     id: string
     label: string
@@ -33,24 +35,72 @@ export const ImageUploadNode = memo(({ data, selected, id }: NodeProps) => {
       ? 'text-emerald-300'
       : 'text-sky-300'
 
-  const [preview, setPreview] = useState<string>((data?.imageUrl as string) || '')
+  // If assetPath exists, construct protocol URL, otherwise use base64/blob
+  const getInitialPreview = () => {
+    if (data?.assetPath && workflowId) {
+      return `opencanvas://${workflowId}/${data.assetPath}`
+    }
+    return (data?.imageUrl as string) || ''
+  }
+
+  const [preview, setPreview] = useState<string>(getInitialPreview())
+  const [isUploading, setIsUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Update preview if data changes externally
+  useEffect(() => {
+    setPreview(getInitialPreview())
+  }, [data?.assetPath, data?.imageUrl, workflowId])
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (file) {
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        const result = reader.result as string
-        setPreview(result)
-        if (data?.onUpdateNodeData && typeof data.onUpdateNodeData === 'function') {
-          (data.onUpdateNodeData as (id: string, data: any) => void)(id, {
-            imageUrl: result,
-            fileName: file.name
-          })
+    if (file && workflowId) {
+      setIsUploading(true)
+      try {
+        // Read file as ArrayBuffer
+        const buffer = await file.arrayBuffer()
+
+        // Save asset via IPC
+        // Convert ArrayBuffer to Buffer (Node.js) compatible format if needed
+        // Electron IPC handles ArrayBuffer natively or we might need to cast
+        // But our preload expects Buffer. In renderer, we send ArrayBuffer/Uint8Array
+
+        const response = await window.electron.saveAsset(
+          workflowId,
+          id,
+          // @ts-ignore - Electron IPC handles this
+          buffer,
+          file.name,
+          'image',
+          file.type
+        )
+
+        if (response.success && response.data) {
+          const { filePath } = response.data // e.g. "assets/nodeId_assetId.png"
+
+          // Update node data with asset path
+          // We also keep imageUrl as a temporary preview or fallback if needed?
+          // No, let's switch to assetPath.
+
+          // For immediate feedback, creating a Blob URL
+          const blobUrl = URL.createObjectURL(file)
+          setPreview(blobUrl)
+
+          if (data?.onUpdateNodeData && typeof data.onUpdateNodeData === 'function') {
+            (data.onUpdateNodeData as (id: string, data: any) => void)(id, {
+              assetPath: filePath,
+              fileName: file.name,
+              imageUrl: '' // Clear base64 to save space
+            })
+          }
+        } else {
+          console.error("Failed to save asset:", response.error)
         }
+      } catch (error) {
+        console.error("Error uploading asset:", error)
+      } finally {
+        setIsUploading(false)
       }
-      reader.readAsDataURL(file)
     }
   }
 
@@ -59,6 +109,7 @@ export const ImageUploadNode = memo(({ data, selected, id }: NodeProps) => {
     if (data?.onUpdateNodeData && typeof data.onUpdateNodeData === 'function') {
       (data.onUpdateNodeData as (id: string, data: any) => void)(id, {
         imageUrl: '',
+        assetPath: '',
         fileName: ''
       })
     }
@@ -88,7 +139,11 @@ export const ImageUploadNode = memo(({ data, selected, id }: NodeProps) => {
 
         {/* Content */}
         <div className="space-y-2">
-          {preview ? (
+          {isUploading ? (
+            <div className="h-32 flex items-center justify-center border-2 border-dashed border-border rounded-md">
+              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : preview ? (
             <div className="relative group">
               <img
                 src={preview}

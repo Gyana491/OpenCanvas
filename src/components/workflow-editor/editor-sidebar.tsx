@@ -19,16 +19,18 @@ import {
   Share2,
   Settings,
   ChevronRight,
+  Save,
 } from "lucide-react"
 import { useNavigate } from "@tanstack/react-router"
 
 interface EditorSidebarProps {
   onSearchClick?: () => void
   onLayersClick?: () => void
+  onSave?: () => void
   isLibraryOpen?: boolean
 }
 
-export function EditorSidebar({ onSearchClick, onLayersClick, isLibraryOpen }: EditorSidebarProps) {
+export function EditorSidebar({ onSearchClick, onLayersClick, onSave, isLibraryOpen }: EditorSidebarProps) {
   const navigate = useNavigate()
 
   return (
@@ -53,6 +55,12 @@ export function EditorSidebar({ onSearchClick, onLayersClick, isLibraryOpen }: E
               <ArrowLeft className="mr-2 h-4 w-4" />
               Back to Dashboard
             </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={onSave}>
+              <Save className="mr-2 h-4 w-4" />
+              Save
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
             <DropdownMenuItem>
               <FileText className="mr-2 h-4 w-4" />
               New File
@@ -102,6 +110,15 @@ export function EditorSidebar({ onSearchClick, onLayersClick, isLibraryOpen }: E
           onClick={onLayersClick}
         >
           <Layers className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-9 w-9"
+          onClick={onSave}
+          title="Save (Cmd+S)"
+        >
+          <Save className="h-4 w-4" />
         </Button>
       </div>
     </div>

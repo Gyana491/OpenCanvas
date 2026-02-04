@@ -192,9 +192,20 @@ function DashboardPage() {
                         Updated {formatDistanceToNow(workflow.updatedAt, { addSuffix: true })}
                       </CardDescription>
                     </CardHeader>
-                    <CardContent>
-                      <div className="aspect-video bg-muted rounded-md flex items-center justify-center">
-                        <FileText className="h-8 w-8 text-muted-foreground" />
+                    <CardContent className="p-0">
+                      <div className="aspect-video bg-muted rounded-t-md overflow-hidden flex items-center justify-center relative">
+                        <img
+                          src={`opencanvas://${workflow.id}/thumbnail`}
+                          alt={workflow.name}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                            e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                          }}
+                        />
+                        <div className="absolute inset-0 flex items-center justify-center hidden bg-muted">
+                          <FileText className="h-8 w-8 text-muted-foreground" />
+                        </div>
                       </div>
                     </CardContent>
                     <CardFooter className="flex justify-between">
