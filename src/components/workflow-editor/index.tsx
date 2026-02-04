@@ -20,11 +20,15 @@ import {
   MarkerType,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { Activity } from 'lucide-react'
+import { Activity, Download } from 'lucide-react'
 import { toast } from 'sonner'
 import { toPng } from 'html-to-image'
 
+import { ExportDialog } from './export-dialog'
+import { ImportDialog, mtImportLogic } from './import-dialog'
 
+
+import { Button } from "@/components/ui/button"
 import { EditorSidebar } from './editor-sidebar'
 import { NodeLibrary } from './node-library'
 import { NodeProperties } from './node-properties'
@@ -235,6 +239,8 @@ function WorkflowEditorInner() {
   const [isLoading, setIsLoading] = useState(true)
   const [currentWorkflowId, setCurrentWorkflowId] = useState<string | null>(null)
   const { screenToFlowPosition, setViewport, getViewport } = useReactFlow()
+  const [isExportDialogOpen, setIsExportDialogOpen] = useState(false)
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false)
 
   // Auto-save timer ref
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null)
@@ -567,6 +573,15 @@ function WorkflowEditorInner() {
     (event: React.DragEvent) => {
       event.preventDefault()
 
+      // Check for file drops
+      if (event.dataTransfer.files && event.dataTransfer.files.length > 0) {
+        const file = event.dataTransfer.files[0]
+        if (file.name.endsWith('.json') || file.name.endsWith('.zip')) {
+          mtImportLogic(file, router.navigate, setNodes, setEdges, setViewport)
+          return
+        }
+      }
+
       const nodeType = event.dataTransfer.getData('application/reactflow')
       if (!nodeType) {
         return
@@ -621,7 +636,7 @@ function WorkflowEditorInner() {
 
       setNodes((nds) => [...nds, newNode])
     },
-    [screenToFlowPosition, setNodes, updateNodeData]
+    [screenToFlowPosition, setNodes, updateNodeData, router.navigate, setEdges, setViewport]
   )
 
   const onNodeClick = useCallback((_: React.MouseEvent, node: any) => {
@@ -739,11 +754,25 @@ function WorkflowEditorInner() {
         onSearchClick={() => setIsLibraryOpen(true)}
         onLayersClick={() => setIsLibraryOpen(!isLibraryOpen)}
         onSave={handleManualSave}
+        onImport={() => setIsImportDialogOpen(true)}
         isLibraryOpen={isLibraryOpen}
       />
 
       {/* Full width canvas area */}
       <div className="flex-1 relative">
+        {/* Top Right Action Bar */}
+        <div className={`absolute top-4 right-4 z-50 flex gap-2 transition-all duration-300 ${isRightSidebarOpen ? 'mr-80' : ''}`}>
+          <Button
+            variant="outline"
+            size="sm"
+            className="shadow-sm bg-background/80 backdrop-blur-sm h-9 px-4"
+            onClick={() => setIsExportDialogOpen(true)}
+          >
+            <Download className="mr-2 h-4 w-4" />
+            Export
+          </Button>
+        </div>
+
         <ReactFlow
           nodes={nodes}
           edges={edges}
@@ -792,10 +821,23 @@ function WorkflowEditorInner() {
           node={selectedNode}
           onUpdateNode={updateNodeData}
           isOpen={isRightSidebarOpen}
+          onExport={() => setIsExportDialogOpen(true)}
           onClose={() => {
             setIsRightSidebarOpen(false)
             setSelectedNode(null)
           }}
+        />
+        {/* Dialogs */}
+        <ExportDialog
+          isOpen={isExportDialogOpen}
+          onClose={() => setIsExportDialogOpen(false)}
+          workflowId={currentWorkflowId}
+          workflowName={nodes.length > 0 ? "My Workflow" : "New Workflow"}
+        />
+
+        <ImportDialog
+          isOpen={isImportDialogOpen}
+          onClose={() => setIsImportDialogOpen(false)}
         />
       </div>
     </div>

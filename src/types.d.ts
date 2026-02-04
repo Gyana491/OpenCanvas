@@ -61,6 +61,7 @@ declare global {
                 error?: string
             }>
 
+
             saveAsset: (
                 workflowId: string,
                 nodeId: string,
@@ -71,6 +72,18 @@ declare global {
             ) => Promise<{
                 success: boolean
                 data?: { filePath: string }
+                error?: string
+            }>
+
+            exportProject: (id: string) => Promise<{
+                success: boolean
+                data?: Uint8Array
+                error?: string
+            }>
+
+            importProject: (zipBuffer: ArrayBuffer | Buffer) => Promise<{
+                success: boolean
+                data?: any
                 error?: string
             }>
         }

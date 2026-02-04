@@ -23,14 +23,16 @@ import {
 } from "lucide-react"
 import { useNavigate } from "@tanstack/react-router"
 
+
 interface EditorSidebarProps {
   onSearchClick?: () => void
   onLayersClick?: () => void
   onSave?: () => void
+  onImport?: () => void
   isLibraryOpen?: boolean
 }
 
-export function EditorSidebar({ onSearchClick, onLayersClick, onSave, isLibraryOpen }: EditorSidebarProps) {
+export function EditorSidebar({ onSearchClick, onLayersClick, onSave, onImport, isLibraryOpen }: EditorSidebarProps) {
   const navigate = useNavigate()
 
   return (
@@ -59,6 +61,10 @@ export function EditorSidebar({ onSearchClick, onLayersClick, onSave, isLibraryO
             <DropdownMenuItem onClick={onSave}>
               <Save className="mr-2 h-4 w-4" />
               Save
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onImport}>
+              <FolderIcon className="mr-2 h-4 w-4" />
+              Import...
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem>
@@ -100,6 +106,7 @@ export function EditorSidebar({ onSearchClick, onLayersClick, onSave, isLibraryO
           size="icon"
           className="h-9 w-9"
           onClick={onSearchClick}
+          title="Search Nodes"
         >
           <Search className="h-4 w-4" />
         </Button>
@@ -108,8 +115,18 @@ export function EditorSidebar({ onSearchClick, onLayersClick, onSave, isLibraryO
           size="icon"
           className={`h-9 w-9 ${isLibraryOpen ? 'bg-accent text-accent-foreground' : ''}`}
           onClick={onLayersClick}
+          title="Node Library"
         >
           <Layers className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-9 w-9"
+          onClick={onImport}
+          title="Import"
+        >
+          <FolderIcon className="h-4 w-4" />
         </Button>
         <Button
           variant="ghost"
