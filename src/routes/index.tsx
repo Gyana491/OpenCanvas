@@ -1,9 +1,10 @@
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Plus, Search, Grid3x3, List, Trash2, FileText, Loader2 } from "lucide-react"
+import { Plus, Search, Grid3x3, List, Trash2, FileText, Loader2, Package } from "lucide-react"
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { AppSidebar } from "@/components/app-sidebar"
 import { ModeToggle } from "@/components/mode-toggle"
+import { ImportDialog } from "@/components/workflow-editor/import-dialog"
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -19,8 +20,10 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { useEffect, useState } from "react"
 import { formatDistanceToNow } from "date-fns"
+import { toast } from "sonner"
 
 export const Route = createFileRoute("/")({
   component: DashboardPage,
@@ -38,6 +41,7 @@ function DashboardPage() {
   const [workflows, setWorkflows] = useState<WorkflowCardData[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false)
 
   // Load workflows on mount
   useEffect(() => {
@@ -135,9 +139,14 @@ function DashboardPage() {
           <div className="flex-1 space-y-6">
             <div className="flex items-center justify-between">
               <h2 className="text-2xl font-semibold tracking-tight">My Workflows</h2>
-              <Button onClick={handleCreateNewFile}>
-                <Plus className="mr-2 h-4 w-4" /> Create New Workflow
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" onClick={() => setIsImportDialogOpen(true)}>
+                  <Package className="mr-2 h-4 w-4" /> Import Workflow
+                </Button>
+                <Button onClick={handleCreateNewFile}>
+                  <Plus className="mr-2 h-4 w-4" /> Create New Workflow
+                </Button>
+              </div>
             </div>
 
             <div className="flex items-center justify-between gap-4">
@@ -183,58 +192,64 @@ function DashboardPage() {
                 )}
               </div>
             ) : (
-              <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {filteredWorkflows.map((workflow) => (
-                  <Card
-                    key={workflow.id}
-                    className="group hover:shadow-lg transition-shadow cursor-pointer"
-                    onClick={() => handleOpenWorkflow(workflow.id)}
-                  >
-                    <CardHeader>
-                      <CardTitle className="text-base line-clamp-1">{workflow.name}</CardTitle>
-                      <CardDescription>
-                        Updated {formatDistanceToNow(workflow.updatedAt, { addSuffix: true })}
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="p-0">
-                      <div className="aspect-video bg-muted rounded-t-md overflow-hidden flex items-center justify-center relative">
-                        <img
-                          src={`opencanvas://${workflow.id}/thumbnail`}
-                          alt={workflow.name}
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            e.currentTarget.style.display = 'none';
-                            e.currentTarget.nextElementSibling?.classList.remove('hidden');
-                          }}
-                        />
-                        <div className="absolute inset-0 flex items-center justify-center hidden bg-muted">
-                          <FileText className="h-8 w-8 text-muted-foreground" />
+              <ScrollArea className="h-[calc(100vh-16rem)]">
+                <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 pr-4">
+                  {filteredWorkflows.map((workflow) => (
+                    <Card
+                      key={workflow.id}
+                      className="group hover:shadow-lg transition-shadow cursor-pointer"
+                      onClick={() => handleOpenWorkflow(workflow.id)}
+                    >
+                      <CardHeader>
+                        <CardTitle className="text-base line-clamp-1">{workflow.name}</CardTitle>
+                        <CardDescription>
+                          Updated {formatDistanceToNow(workflow.updatedAt, { addSuffix: true })}
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="p-0">
+                        <div className="aspect-video bg-muted rounded-t-md overflow-hidden flex items-center justify-center relative">
+                          <img
+                            src={`opencanvas://${workflow.id}/thumbnail`}
+                            alt={workflow.name}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                              e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                            }}
+                          />
+                          <div className="absolute inset-0 flex items-center justify-center hidden bg-muted">
+                            <FileText className="h-8 w-8 text-muted-foreground" />
+                          </div>
                         </div>
-                      </div>
-                    </CardContent>
-                    <CardFooter className="flex justify-between">
-                      <span className="text-xs text-muted-foreground">
-                        Created {formatDistanceToNow(workflow.createdAt, { addSuffix: true })}
-                      </span>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleDeleteWorkflow(workflow.id)
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </CardFooter>
-                  </Card>
-                ))}
-              </div>
+                      </CardContent>
+                      <CardFooter className="flex justify-between">
+                        <span className="text-xs text-muted-foreground">
+                          Created {formatDistanceToNow(workflow.createdAt, { addSuffix: true })}
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleDeleteWorkflow(workflow.id)
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </CardFooter>
+                    </Card>
+                  ))}
+                </div>
+              </ScrollArea>
             )}
           </div>
         </div>
       </SidebarInset>
+      <ImportDialog
+        isOpen={isImportDialogOpen}
+        onClose={() => setIsImportDialogOpen(false)}
+      />
     </SidebarProvider>
   )
 }

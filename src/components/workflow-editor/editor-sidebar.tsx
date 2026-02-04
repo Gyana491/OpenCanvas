@@ -28,11 +28,11 @@ interface EditorSidebarProps {
   onSearchClick?: () => void
   onLayersClick?: () => void
   onSave?: () => void
-  onImport?: () => void
+  onBackToDashboard?: () => void
   isLibraryOpen?: boolean
 }
 
-export function EditorSidebar({ onSearchClick, onLayersClick, onSave, onImport, isLibraryOpen }: EditorSidebarProps) {
+export function EditorSidebar({ onSearchClick, onLayersClick, onSave, onBackToDashboard, isLibraryOpen }: EditorSidebarProps) {
   const navigate = useNavigate()
 
   return (
@@ -53,7 +53,7 @@ export function EditorSidebar({ onSearchClick, onLayersClick, onSave, onImport, 
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-56">
-            <DropdownMenuItem onClick={() => navigate({ to: '/' })}>
+            <DropdownMenuItem onClick={onBackToDashboard || (() => navigate({ to: '/' }))}>
               <ArrowLeft className="mr-2 h-4 w-4" />
               Back to Dashboard
             </DropdownMenuItem>
@@ -61,10 +61,6 @@ export function EditorSidebar({ onSearchClick, onLayersClick, onSave, onImport, 
             <DropdownMenuItem onClick={onSave}>
               <Save className="mr-2 h-4 w-4" />
               Save
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={onImport}>
-              <FolderIcon className="mr-2 h-4 w-4" />
-              Import...
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem>
@@ -118,15 +114,6 @@ export function EditorSidebar({ onSearchClick, onLayersClick, onSave, onImport, 
           title="Node Library"
         >
           <Layers className="h-4 w-4" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-9 w-9"
-          onClick={onImport}
-          title="Import"
-        >
-          <FolderIcon className="h-4 w-4" />
         </Button>
         <Button
           variant="ghost"

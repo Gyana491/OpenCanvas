@@ -25,7 +25,7 @@ import { toast } from 'sonner'
 import { toPng } from 'html-to-image'
 
 import { ExportDialog } from './export-dialog'
-import { ImportDialog, mtImportLogic } from './import-dialog'
+import { ImportDialog, importWorkflowAction } from './import-dialog'
 
 
 import { Button } from "@/components/ui/button"
@@ -240,7 +240,7 @@ function WorkflowEditorInner() {
   const [currentWorkflowId, setCurrentWorkflowId] = useState<string | null>(null)
   const { screenToFlowPosition, setViewport, getViewport } = useReactFlow()
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false)
-  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false)
+  const [shouldGenerateThumbnail, setShouldGenerateThumbnail] = useState(false)
 
   // Auto-save timer ref
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null)
@@ -293,6 +293,8 @@ function WorkflowEditorInner() {
             if (viewport) {
               setViewport(viewport, { duration: 0 })
             }
+            // Trigger thumbnail generation for newly loaded workflows
+            setShouldGenerateThumbnail(true)
           } else {
             console.error('[Workflow Editor] Failed to load workflow:', response.error)
             // If workflow doesn't exist, redirect to home
@@ -335,6 +337,33 @@ function WorkflowEditorInner() {
     return { nodes: serializableNodes, edges }
   }, [])
 
+  // Generate thumbnail helper
+  const generateThumbnail = useCallback(async (): Promise<ArrayBuffer | undefined> => {
+    try {
+      const viewport = getViewport()
+      const flowElement = document.querySelector('.react-flow__viewport') as HTMLElement
+      if (!flowElement) return undefined
+
+      const dataUrl = await toPng(flowElement, {
+        backgroundColor: '#fff',
+        width: flowElement.offsetWidth,
+        height: flowElement.offsetHeight,
+        style: {
+          width: `${flowElement.offsetWidth}px`,
+          height: `${flowElement.offsetHeight}px`,
+          transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})`
+        }
+      })
+
+      // Convert base64 to ArrayBuffer
+      const response = await fetch(dataUrl)
+      return await response.arrayBuffer()
+    } catch (err) {
+      console.error('Failed to generate thumbnail:', err)
+      return undefined
+    }
+  }, [getViewport])
+
   // Auto-save workflow when nodes, edges, or viewport changes
   useEffect(() => {
     if (isLoading || !window.electron || !currentWorkflowId) {
@@ -376,6 +405,54 @@ function WorkflowEditorInner() {
       }
     }
   }, [nodes, edges, currentWorkflowId, isLoading, getViewport, getSerializableGraph])
+
+  // Listen for save-before-import event from global drop handler
+  useEffect(() => {
+    const handleSaveBeforeImport = async (event: any) => {
+      const { workflowId } = event.detail;
+      if (workflowId === currentWorkflowId && currentWorkflowId && window.electron) {
+        try {
+          const viewport = getViewport();
+          const { nodes: safeNodes, edges: safeEdges } = getSerializableGraph(nodes, edges);
+          const thumbnailBuffer = await generateThumbnail();
+          await window.electron.saveWorkflow(currentWorkflowId, safeNodes, safeEdges, viewport, thumbnailBuffer);
+          console.log('[Workflow Editor] Saved workflow before import:', currentWorkflowId);
+        } catch (error) {
+          console.error('[Workflow Editor] Failed to save before import:', error);
+        }
+      }
+    };
+
+    window.addEventListener('save-before-import', handleSaveBeforeImport);
+    return () => window.removeEventListener('save-before-import', handleSaveBeforeImport);
+  }, [currentWorkflowId, getViewport, getSerializableGraph, nodes, edges, generateThumbnail])
+
+  // Generate thumbnail after workflow loads (for imported workflows)
+  useEffect(() => {
+    if (!shouldGenerateThumbnail || !currentWorkflowId || !window.electron || nodes.length === 0) {
+      return
+    }
+
+    // Wait a bit for the canvas to render
+    const timer = setTimeout(async () => {
+      try {
+        const viewport = getViewport()
+        const { nodes: safeNodes, edges: safeEdges } = getSerializableGraph(nodes, edges)
+        const thumbnailBuffer = await generateThumbnail()
+
+        if (thumbnailBuffer) {
+          await window.electron.saveWorkflow(currentWorkflowId, safeNodes, safeEdges, viewport, thumbnailBuffer)
+          console.log('[Workflow Editor] Generated thumbnail for imported workflow:', currentWorkflowId)
+        }
+      } catch (error) {
+        console.error('[Workflow Editor] Failed to generate thumbnail after load:', error)
+      } finally {
+        setShouldGenerateThumbnail(false)
+      }
+    }, 1000) // Wait 1 second for canvas to render
+
+    return () => clearTimeout(timer)
+  }, [shouldGenerateThumbnail, currentWorkflowId, nodes, edges, getViewport, getSerializableGraph, generateThumbnail])
 
   const toggleAnimation = useCallback(() => {
     setIsAnimated((prev) => !prev)
@@ -577,7 +654,22 @@ function WorkflowEditorInner() {
       if (event.dataTransfer.files && event.dataTransfer.files.length > 0) {
         const file = event.dataTransfer.files[0]
         if (file.name.endsWith('.json') || file.name.endsWith('.zip')) {
-          mtImportLogic(file, router.navigate, setNodes, setEdges, setViewport)
+          // Create beforeImport callback to save current workflow
+          const beforeImport = async () => {
+            if (currentWorkflowId && window.electron) {
+              try {
+                const viewport = getViewport()
+                const { nodes: safeNodes, edges: safeEdges } = getSerializableGraph(nodes, edges)
+                const thumbnailBuffer = await generateThumbnail()
+                await window.electron.saveWorkflow(currentWorkflowId, safeNodes, safeEdges, viewport, thumbnailBuffer)
+                console.log('[Workflow Editor] Saved workflow before import')
+              } catch (error) {
+                console.error('[Workflow Editor] Failed to save before import:', error)
+              }
+            }
+          }
+
+          importWorkflowAction(file, router.navigate, setNodes, setEdges, setViewport, beforeImport)
           return
         }
       }
@@ -636,7 +728,7 @@ function WorkflowEditorInner() {
 
       setNodes((nds) => [...nds, newNode])
     },
-    [screenToFlowPosition, setNodes, updateNodeData, router.navigate, setEdges, setViewport]
+    [screenToFlowPosition, setNodes, updateNodeData, router.navigate, setEdges, setViewport, currentWorkflowId, getViewport, getSerializableGraph, nodes, edges, generateThumbnail]
   )
 
   const onNodeClick = useCallback((_: React.MouseEvent, node: any) => {
@@ -709,35 +801,12 @@ function WorkflowEditorInner() {
       const { nodes: safeNodes, edges: safeEdges } = getSerializableGraph(nodes, edges)
 
       // Capture thumbnail
-      let thumbnailBuffer: ArrayBuffer | undefined
-      try {
-        const flowElement = document.querySelector('.react-flow__viewport') as HTMLElement
-        if (flowElement) {
-          const dataUrl = await toPng(flowElement, {
-            backgroundColor: '#fff',
-            width: flowElement.offsetWidth,
-            height: flowElement.offsetHeight,
-            style: {
-              width: `${flowElement.offsetWidth}px`,
-              height: `${flowElement.offsetHeight}px`,
-              transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})`
-            }
-          })
-
-          // Convert base64 to ArrayBuffer
-          const response = await fetch(dataUrl)
-          thumbnailBuffer = await response.arrayBuffer()
-        }
-      } catch (err) {
-        console.error('Failed to generate thumbnail:', err)
-        // Proceed without thumbnail
-      }
+      const thumbnailBuffer = await generateThumbnail()
 
       const response = await window.electron.saveWorkflow(currentWorkflowId, safeNodes, safeEdges, viewport, thumbnailBuffer)
       if (response.success) {
         toast.success('Workflow saved successfully')
         console.log('[Workflow Editor] Manually saved workflow:', currentWorkflowId)
-        // Update URL if it was a new workflow and ID changed (though createWorkflow handles that)
       } else {
         toast.error(`Failed to save workflow: ${response.error}`)
       }
@@ -745,7 +814,24 @@ function WorkflowEditorInner() {
       console.error('[Workflow Editor] Manual save error:', error)
       toast.error('An error occurred while saving')
     }
-  }, [currentWorkflowId, getViewport, getSerializableGraph, nodes, edges])
+  }, [currentWorkflowId, getViewport, getSerializableGraph, nodes, edges, generateThumbnail])
+
+  const handleBackToDashboard = useCallback(async () => {
+    // Auto-save before navigating back
+    if (currentWorkflowId && window.electron) {
+      try {
+        const viewport = getViewport()
+        const { nodes: safeNodes, edges: safeEdges } = getSerializableGraph(nodes, edges)
+        const thumbnailBuffer = await generateThumbnail()
+
+        await window.electron.saveWorkflow(currentWorkflowId, safeNodes, safeEdges, viewport, thumbnailBuffer)
+        console.log('[Workflow Editor] Auto-saved before navigation')
+      } catch (error) {
+        console.error('[Workflow Editor] Auto-save before navigation failed:', error)
+      }
+    }
+    router.navigate({ to: '/' })
+  }, [currentWorkflowId, getViewport, getSerializableGraph, nodes, edges, generateThumbnail, router])
 
   return (
     <div className="flex h-screen w-full bg-background">
@@ -754,7 +840,7 @@ function WorkflowEditorInner() {
         onSearchClick={() => setIsLibraryOpen(true)}
         onLayersClick={() => setIsLibraryOpen(!isLibraryOpen)}
         onSave={handleManualSave}
-        onImport={() => setIsImportDialogOpen(true)}
+        onBackToDashboard={handleBackToDashboard}
         isLibraryOpen={isLibraryOpen}
       />
 
@@ -833,11 +919,6 @@ function WorkflowEditorInner() {
           onClose={() => setIsExportDialogOpen(false)}
           workflowId={currentWorkflowId}
           workflowName={nodes.length > 0 ? "My Workflow" : "New Workflow"}
-        />
-
-        <ImportDialog
-          isOpen={isImportDialogOpen}
-          onClose={() => setIsImportDialogOpen(false)}
         />
       </div>
     </div>

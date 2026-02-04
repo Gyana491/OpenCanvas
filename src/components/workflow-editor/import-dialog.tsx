@@ -11,19 +11,19 @@ import { Button } from "@/components/ui/button"
 import { Upload, FileArchive, FileJson, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import { useRouter } from '@tanstack/react-router'
-import { useReactFlow } from '@xyflow/react'
 
 interface ImportDialogProps {
     isOpen: boolean
     onClose: () => void
 }
 
-export function mtImportLogic(
+export function importWorkflowAction(
     file: File,
     navigate: (opts: any) => void,
     setNodes?: (nodes: any) => void,
     setEdges?: (edges: any) => void,
-    setViewport?: (viewport: any) => void
+    setViewport?: (viewport: any) => void,
+    beforeImport?: () => Promise<void>
 ) {
     return new Promise<void>(async (resolve, reject) => {
         try {
@@ -43,6 +43,11 @@ export function mtImportLogic(
                     const workflowData = result.data
                     toast.success('Project imported successfully')
 
+                    // Save current workflow before navigating (if callback provided)
+                    if (beforeImport) {
+                        await beforeImport()
+                    }
+
                     // Navigate to the imported workflow
                     navigate({ to: '/editor/$id', params: { id: workflowData.id } })
                     resolve()
@@ -60,6 +65,25 @@ export function mtImportLogic(
                     throw new Error('Invalid workflow JSON')
                 }
 
+                // Sanitize nodes to remove broken asset URLs
+                const sanitizedNodes = data.nodes.map((node: any) => {
+                    const sanitizedData = { ...node.data }
+
+                    // Delete asset-related keys entirely
+                    delete sanitizedData.imageUrl
+                    delete sanitizedData.imageOutput
+                    delete sanitizedData.output
+                    delete sanitizedData.videoUrl
+                    delete sanitizedData.connectedImage
+                    delete sanitizedData.connectedVideo
+                    delete sanitizedData.assetPath
+
+                    return {
+                        ...node,
+                        data: sanitizedData
+                    }
+                })
+
                 // Create a new workflow for this import
                 const createResult = await window.electron.createWorkflow(data.name || 'Imported Workflow')
 
@@ -69,16 +93,22 @@ export function mtImportLogic(
                     // Save the imported data to this new workflow
                     await window.electron.saveWorkflow(
                         newId,
-                        data.nodes,
+                        sanitizedNodes,
                         data.edges,
                         data.viewport || { x: 0, y: 0, zoom: 1 }
                     )
 
                     toast.success('Workflow imported successfully')
+
+                    // Save current workflow before navigating (if callback provided)
+                    if (beforeImport) {
+                        await beforeImport()
+                    }
+
                     navigate({ to: '/editor/$id', params: { id: newId } })
 
                     // If we are already on the editor and just need to update state (optional, router usually handles this)
-                    if (setNodes) setNodes(data.nodes)
+                    if (setNodes) setNodes(sanitizedNodes)
                     if (setEdges) setEdges(data.edges)
                     if (setViewport && data.viewport) setViewport(data.viewport)
 
@@ -112,7 +142,7 @@ export function ImportDialog({ isOpen, onClose }: ImportDialogProps) {
 
         setIsUploading(true)
         try {
-            await mtImportLogic(file, router.navigate)
+            await importWorkflowAction(file, router.navigate)
             onClose()
         } catch (error) {
             // toast handled in logic
@@ -130,7 +160,7 @@ export function ImportDialog({ isOpen, onClose }: ImportDialogProps) {
 
         setIsUploading(true)
         try {
-            await mtImportLogic(file, router.navigate)
+            await importWorkflowAction(file, router.navigate)
             onClose()
         } catch (error) {
             // toast handled in logic

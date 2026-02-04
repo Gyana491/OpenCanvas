@@ -27,9 +27,28 @@ export function ExportDialog({ isOpen, onClose, workflowId, workflowName = 'work
 
     const handleExportJson = async () => {
         try {
-            const nodes = getNodes()
+            const rawNodes = getNodes()
             const edges = getEdges()
             const viewport = getViewport()
+
+            // Sanitize nodes to remove asset URLs (opencanvas:// references)
+            const nodes = rawNodes.map(node => {
+                const sanitizedData = { ...node.data }
+
+                // Delete asset-related keys entirely
+                delete sanitizedData.imageUrl
+                delete sanitizedData.imageOutput
+                delete sanitizedData.output
+                delete sanitizedData.videoUrl
+                delete sanitizedData.connectedImage
+                delete sanitizedData.connectedVideo
+                delete sanitizedData.assetPath
+
+                return {
+                    ...node,
+                    data: sanitizedData
+                }
+            })
 
             const data = {
                 id: workflowId,
@@ -44,7 +63,7 @@ export function ExportDialog({ isOpen, onClose, workflowId, workflowName = 'work
             const url = URL.createObjectURL(blob)
             const a = document.createElement('a')
             a.href = url
-            a.download = `${workflowName.replace(/\s+/g, '-').toLowerCase()}.json`
+            a.download = `opencanvas_workflow_${workflowId || 'unknown'}.json`
             document.body.appendChild(a)
             a.click()
             document.body.removeChild(a)
@@ -64,9 +83,25 @@ export function ExportDialog({ isOpen, onClose, workflowId, workflowName = 'work
         setIsExporting(true)
         try {
             // First ensure the latest state is saved
-            const nodes = getNodes()
+            const rawNodes = getNodes()
             const edges = getEdges()
             const viewport = getViewport()
+
+            // Sanitize nodes (remove functions for IPC cloning)
+            const nodes = rawNodes.map(node => {
+                const { data, ...rest } = node
+                const cleanData = Object.entries(data).reduce((acc, [key, value]) => {
+                    if (typeof value !== 'function') {
+                        acc[key] = value
+                    }
+                    return acc
+                }, {} as Record<string, any>)
+
+                return {
+                    ...rest,
+                    data: cleanData
+                }
+            })
 
             // Save current state first to ensure zip is up to date
             await window.electron.saveWorkflow(workflowId, nodes, edges, viewport)
@@ -80,7 +115,7 @@ export function ExportDialog({ isOpen, onClose, workflowId, workflowName = 'work
                 const url = URL.createObjectURL(blob)
                 const a = document.createElement('a')
                 a.href = url
-                a.download = `${workflowName.replace(/\s+/g, '-').toLowerCase()}.zip`
+                a.download = `opencanvas_${workflowId}.zip`
                 document.body.appendChild(a)
                 a.click()
                 document.body.removeChild(a)
