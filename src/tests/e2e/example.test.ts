@@ -40,5 +40,5 @@ test("renders the first page", async () => {
 
   const title = await page.waitForSelector("h1");
   const text = await title.textContent();
-  expect(text).toBe("electron-shadcn");
+  expect(text).toBe("OpenCanvas");
 });

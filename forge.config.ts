@@ -27,8 +27,8 @@ const config: ForgeConfig = {
       name: "@electron-forge/publisher-github",
       config: {
         repository: {
-          owner: "LuanRoger",
-          name: "electron-shadcn",
+          owner: "Gyana Ranjan",
+          name: "OpenCanvas",
         },
         draft: true,
         prerelease: false,

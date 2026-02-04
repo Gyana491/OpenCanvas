@@ -6,20 +6,20 @@ i18n.use(initReactI18next).init({
   resources: {
     en: {
       translation: {
-        appName: "electron-shadcn",
+        appName: "OpenCanvas",
         titleHomePage: "Home Page",
         titleSecondPage: "Second Page",
         documentation: "Documentation",
-        madeBy: "Made by LuanRoger",
+        madeBy: "Made by Gyana Ranjan",
       },
     },
     "pt-BR": {
       translation: {
-        appName: "electron-shadcn",
+        appName: "OpenCanvas",
         titleHomePage: "Página Inicial",
         titleSecondPage: "Segunda Página",
         documentation: "Documentação",
-        madeBy: "Feito por LuanRoger",
+        madeBy: "Feito por Gyana Ranjan",
       },
     },
   },

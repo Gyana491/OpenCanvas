@@ -251,7 +251,7 @@ function downloadJson(data: any, filename: string) {
 }
 
 function downloadZip(data: Uint8Array, filename: string) {
-    const blob = new Blob([data], { type: 'application/zip' })
+    const blob = new Blob([data as any], { type: 'application/zip' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
