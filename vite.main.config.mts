@@ -16,8 +16,6 @@ export default defineConfig({
       external: [
         'electron',
         ...builtinModules.flatMap((p: string) => [p, `node:${p}`]),
-        'better-sqlite3',
-        'fs-extra',
       ],
       output: {
         // Ensure proper interop for cjs modules

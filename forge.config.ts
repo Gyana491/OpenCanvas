@@ -10,11 +10,17 @@ import { FuseV1Options, FuseVersion } from "@electron/fuses";
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
+    icon: './images/icon', // Forge will look for .icns on Mac and .ico on Windows
   },
   rebuildConfig: {},
   makers: [
-    new MakerSquirrel({}),
-    new MakerZIP({}, ["darwin"]),
+    ...(process.platform === 'win32' ? [
+      new MakerSquirrel({
+        name: "OpenCanvas",
+        setupIcon: "./images/icon.ico",
+      })
+    ] : []),
+    new MakerZIP({}, ["darwin", "win32"]),
     new MakerRpm({}),
     new MakerDeb({}),
   ],
@@ -27,7 +33,7 @@ const config: ForgeConfig = {
       name: "@electron-forge/publisher-github",
       config: {
         repository: {
-          owner: "Gyana Ranjan",
+          owner: "Gyana491",
           name: "OpenCanvas",
         },
         draft: true,
