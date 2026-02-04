@@ -21,6 +21,14 @@ import {
 } from "@/components/ui/sidebar"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
 import { useEffect, useState } from "react"
 import { formatDistanceToNow } from "date-fns"
 import { toast } from "sonner"
@@ -41,6 +49,7 @@ function DashboardPage() {
   const [workflows, setWorkflows] = useState<WorkflowCardData[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false)
 
   // Load workflows on mount
@@ -161,10 +170,18 @@ function DashboardPage() {
                 />
               </div>
               <div className="flex items-center gap-2">
-                <Button variant="ghost" size="icon">
+                <Button
+                  variant={viewMode === 'list' ? 'secondary' : 'ghost'}
+                  size="icon"
+                  onClick={() => setViewMode('list')}
+                >
                   <List className="h-4 w-4" />
                 </Button>
-                <Button variant="ghost" size="icon">
+                <Button
+                  variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
+                  size="icon"
+                  onClick={() => setViewMode('grid')}
+                >
                   <Grid3x3 className="h-4 w-4" />
                 </Button>
               </div>
@@ -193,54 +210,112 @@ function DashboardPage() {
               </div>
             ) : (
               <ScrollArea className="h-[calc(100vh-16rem)]">
-                <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 pr-4">
-                  {filteredWorkflows.map((workflow) => (
-                    <Card
-                      key={workflow.id}
-                      className="group hover:shadow-lg transition-shadow cursor-pointer"
-                      onClick={() => handleOpenWorkflow(workflow.id)}
-                    >
-                      <CardHeader>
-                        <CardTitle className="text-base line-clamp-1">{workflow.name}</CardTitle>
-                        <CardDescription>
-                          Updated {formatDistanceToNow(workflow.updatedAt, { addSuffix: true })}
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent className="p-0">
-                        <div className="aspect-video bg-muted rounded-t-md overflow-hidden flex items-center justify-center relative">
+                {viewMode === 'grid' ? (
+                  <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 pr-4">
+                    {filteredWorkflows.map((workflow) => (
+                      <Card
+                        key={workflow.id}
+                        className="group hover:shadow-xl transition-all duration-200 cursor-pointer overflow-hidden border-0 bg-card/50 backdrop-blur-sm hover:scale-[1.02]"
+                        onClick={() => handleOpenWorkflow(workflow.id)}
+                      >
+                        {/* Image on top */}
+                        <div className="aspect-video bg-muted overflow-hidden relative">
                           <img
                             src={`opencanvas://${workflow.id}/thumbnail`}
                             alt={workflow.name}
-                            className="w-full h-full object-cover"
+                            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                             onError={(e) => {
                               e.currentTarget.style.display = 'none';
                               e.currentTarget.nextElementSibling?.classList.remove('hidden');
                             }}
                           />
-                          <div className="absolute inset-0 flex items-center justify-center hidden bg-muted">
-                            <FileText className="h-8 w-8 text-muted-foreground" />
+                          <div className="absolute inset-0 flex items-center justify-center hidden bg-gradient-to-br from-muted to-muted/80">
+                            <FileText className="h-12 w-12 text-muted-foreground/50" />
                           </div>
+                          {/* Delete button overlay */}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="absolute top-2 right-2 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity bg-background/80 hover:bg-destructive hover:text-destructive-foreground backdrop-blur-sm"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleDeleteWorkflow(workflow.id)
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
-                      </CardContent>
-                      <CardFooter className="flex justify-between">
-                        <span className="text-xs text-muted-foreground">
-                          Created {formatDistanceToNow(workflow.createdAt, { addSuffix: true })}
-                        </span>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleDeleteWorkflow(workflow.id)
-                          }}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </CardFooter>
-                    </Card>
-                  ))}
-                </div>
+                        {/* Card content below image */}
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-base font-semibold line-clamp-1">{workflow.name}</CardTitle>
+                        </CardHeader>
+                        <CardFooter className="pt-0 pb-3 text-xs text-muted-foreground">
+                          <div className="flex flex-col gap-0.5">
+                            <span>Updated {formatDistanceToNow(workflow.updatedAt, { addSuffix: true })}</span>
+                            <span className="text-muted-foreground/60">Created {formatDistanceToNow(workflow.createdAt, { addSuffix: true })}</span>
+                          </div>
+                        </CardFooter>
+                      </Card>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="pr-4">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Updated</TableHead>
+                          <TableHead>Created</TableHead>
+                          <TableHead className="w-[50px]"></TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredWorkflows.map((workflow) => (
+                          <TableRow
+                            key={workflow.id}
+                            className="cursor-pointer hover:bg-muted/50"
+                            onClick={() => handleOpenWorkflow(workflow.id)}
+                          >
+                            <TableCell className="font-medium">
+                              <div className="flex items-center gap-3">
+                                <div className="h-10 w-16 overflow-hidden rounded bg-muted relative flex-shrink-0">
+                                  <img
+                                    src={`opencanvas://${workflow.id}/thumbnail`}
+                                    alt={workflow.name}
+                                    className="h-full w-full object-cover"
+                                    onError={(e) => {
+                                      e.currentTarget.style.display = 'none';
+                                      e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                                    }}
+                                  />
+                                  <div className="absolute inset-0 flex items-center justify-center hidden bg-muted">
+                                    <FileText className="h-4 w-4 text-muted-foreground" />
+                                  </div>
+                                </div>
+                                <span>{workflow.name}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell>{formatDistanceToNow(workflow.updatedAt, { addSuffix: true })}</TableCell>
+                            <TableCell>{formatDistanceToNow(workflow.createdAt, { addSuffix: true })}</TableCell>
+                            <TableCell>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-muted-foreground hover:text-destructive transition-colors"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleDeleteWorkflow(workflow.id)
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
               </ScrollArea>
             )}
           </div>
