@@ -17,6 +17,8 @@ const config: ForgeConfig = {
     ...(process.platform === 'win32' ? [
       new MakerSquirrel({
         name: "OpenCanvas",
+        authors: "Gyana Ranjan",
+        description: "OpenCanvas Desktop Application",
       })
     ] : []),
     new MakerZIP({}, ["darwin", "win32"]),

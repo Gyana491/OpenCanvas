@@ -2,7 +2,7 @@
   "name": "opencanvas",
   "productName": "OpenCanvas",
   "version": "1.0.0",
-  "description": "",
+  "description": "OpenCanvas Desktop Application",
   "main": ".vite/build/main.js",
   "private": true,
   "scripts": {
