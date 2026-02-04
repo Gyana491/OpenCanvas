@@ -11,14 +11,12 @@ import { FuseV1Options, FuseVersion } from "@electron/fuses";
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
-    icon: './images/icon', // Forge will look for .icns on Mac and .ico on Windows
   },
   rebuildConfig: {},
   makers: [
     ...(process.platform === 'win32' ? [
       new MakerSquirrel({
         name: "OpenCanvas",
-        setupIcon: "./images/icon.ico",
       })
     ] : []),
     new MakerZIP({}, ["darwin", "win32"]),
