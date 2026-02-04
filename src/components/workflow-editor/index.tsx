@@ -1,6 +1,7 @@
 "use client"
 
-import React, { useCallback, useState } from 'react'
+import React, { useCallback, useState, useEffect, useRef } from 'react'
+import { useParams, useRouter } from '@tanstack/react-router'
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -217,6 +218,10 @@ function getNodeHandles(nodeType: string | undefined, data?: any): NodeHandleMet
 }
 
 function WorkflowEditorInner() {
+  const params = useParams({ from: '/editor/$id' })
+  const router = useRouter()
+  const workflowId = params.id
+
   const [nodes, setNodes, onNodesChange] = useNodesState<Node<WorkflowNodeData>>(initialNodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
   const [selectedNode, setSelectedNode] = useState<any>(null)
@@ -224,7 +229,121 @@ function WorkflowEditorInner() {
   const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(false)
   const [connectingSourceHandle, setConnectingSourceHandle] = useState<string | null>(null)
   const [isAnimated, setIsAnimated] = useState(true)
-  const { screenToFlowPosition } = useReactFlow()
+  const [isLoading, setIsLoading] = useState(true)
+  const [currentWorkflowId, setCurrentWorkflowId] = useState<string | null>(null)
+  const { screenToFlowPosition, setViewport, getViewport } = useReactFlow()
+
+  // Auto-save timer ref
+  const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const AUTO_SAVE_DELAY = 2000 // 2 seconds
+
+  // Track if workflow creation is in progress to prevent duplicates
+  const creationInProgressRef = useRef(false)
+
+  // Load workflow on mount
+  useEffect(() => {
+    async function loadWorkflowData() {
+      if (!window.electron || !workflowId) {
+        setIsLoading(false)
+        return
+      }
+
+      try {
+        if (workflowId === 'new') {
+          // Prevent duplicate creation (React.StrictMode causes double effect)
+          if (creationInProgressRef.current) {
+            console.log('[Workflow Editor] Creation already in progress, skipping...')
+            return
+          }
+          
+          creationInProgressRef.current = true
+          
+          // Create new workflow
+          const response = await window.electron.createWorkflow()
+          if (response.success && response.data) {
+            console.log('[Workflow Editor] Created new workflow:', response.data.id)
+            setCurrentWorkflowId(response.data.id)
+            // Navigate to the new workflow ID using router
+            router.navigate({ to: '/editor/$id', params: { id: response.data.id } })
+          } else {
+            console.error('[Workflow Editor] Failed to create workflow:', response.error)
+          }
+        } else {
+          // Load existing workflow
+          const response = await window.electron.loadWorkflow(workflowId)
+          if (response.success && response.data) {
+            const { nodes: loadedNodes, edges: loadedEdges, viewport } = response.data
+            console.log('[Workflow Editor] Loaded workflow:', workflowId, {
+              nodes: loadedNodes.length,
+              edges: loadedEdges.length,
+            })
+
+            setCurrentWorkflowId(workflowId)
+            setNodes(loadedNodes as Node<WorkflowNodeData>[])
+            setEdges(loadedEdges)
+            if (viewport) {
+              setViewport(viewport, { duration: 0 })
+            }
+          } else {
+            console.error('[Workflow Editor] Failed to load workflow:', response.error)
+            // If workflow doesn't exist, redirect to home
+            if (response.error === 'Workflow not found') {
+              router.navigate({ to: '/' })
+            }
+          }
+        }
+      } catch (error) {
+        console.error('[Workflow Editor] Error loading workflow:', error)
+      } finally {
+        setIsLoading(false)
+        creationInProgressRef.current = false
+      }
+    }
+
+    loadWorkflowData()
+    // Only run on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Auto-save workflow when nodes, edges, or viewport changes
+  useEffect(() => {
+    if (isLoading || !window.electron || !currentWorkflowId) {
+      return
+    }
+
+    // Clear existing timer
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current)
+    }
+
+    // Set new auto-save timer
+    autoSaveTimerRef.current = setTimeout(async () => {
+      try {
+        const viewport = getViewport()
+        console.log('[Workflow Editor] Auto-saving workflow:', currentWorkflowId, {
+          nodes: nodes.length,
+          edges: edges.length,
+          viewport
+        })
+        
+        const response = await window.electron.saveWorkflow(currentWorkflowId, nodes, edges, viewport)
+        if (response.success) {
+          console.log('[Workflow Editor] Auto-saved workflow:', currentWorkflowId)
+        } else {
+          console.error('[Workflow Editor] Auto-save failed:', response.error)
+        }
+      } catch (error) {
+        console.error('[Workflow Editor] Auto-save error:', error)
+      }
+    }, AUTO_SAVE_DELAY)
+
+    // Cleanup on unmount
+    return () => {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current)
+      }
+    }
+  }, [nodes, edges, currentWorkflowId, isLoading, getViewport])
 
   const toggleAnimation = useCallback(() => {
     setIsAnimated((prev) => !prev)

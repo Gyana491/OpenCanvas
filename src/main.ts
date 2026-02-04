@@ -1,3 +1,5 @@
+/// <reference types="@electron-forge/plugin-vite/forge-vite-env" />
+
 import { app, BrowserWindow } from "electron";
 import path from "path";
 import {
@@ -8,6 +10,9 @@ import { ipcMain } from "electron/main";
 import { ipcContext } from "@/ipc/context";
 import { IPC_CHANNELS } from "./constants";
 import { updateElectronApp, UpdateSourceType } from "update-electron-app";
+import { initDatabase, runMigrations } from "./db/db";
+import { initStorage } from "./db/storage";
+import { registerWorkflowHandlers } from "./ipc/workflow-handlers";
 
 const inDevelopment = process.env.NODE_ENV === "development";
 
@@ -66,8 +71,32 @@ async function setupORPC() {
   });
 }
 
+async function setupDatabase() {
+  try {
+    console.log('[Main] Initializing database and storage...');
+
+    // Initialize storage directories
+    initStorage();
+
+    // Initialize database connection
+    initDatabase();
+
+    // Run migrations
+    await runMigrations();
+
+    // Register workflow IPC handlers
+    registerWorkflowHandlers();
+
+    console.log('[Main] Database and storage initialized successfully');
+  } catch (error) {
+    console.error('[Main] Failed to initialize database:', error);
+    throw error;
+  }
+}
+
 app
   .whenReady()
+  .then(setupDatabase)
   .then(createWindow)
   .then(installExtensions)
   .then(checkForUpdates)
