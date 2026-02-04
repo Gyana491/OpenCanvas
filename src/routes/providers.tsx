@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { createFileRoute } from "@tanstack/react-router"
 import { AppSidebar } from "@/components/app-sidebar"
+import { ModeToggle } from "@/components/mode-toggle"
 import {
     Breadcrumb,
     BreadcrumbItem,
@@ -50,11 +51,11 @@ function ProvidersPage() {
     }
 
     return (
-        <SidebarProvider defaultOpen={false}>
+        <SidebarProvider defaultOpen={true}>
             <AppSidebar />
             <SidebarInset>
-                <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
-                    <div className="flex items-center gap-2 px-4">
+                <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12 border-b">
+                    <div className="flex items-center gap-2 px-4 w-full">
                         <SidebarTrigger className="-ml-1" />
                         <Separator orientation="vertical" className="mr-2 h-4" />
                         <Breadcrumb>
@@ -70,9 +71,12 @@ function ProvidersPage() {
                                 </BreadcrumbItem>
                             </BreadcrumbList>
                         </Breadcrumb>
+                        <div className="ml-auto">
+                            <ModeToggle />
+                        </div>
                     </div>
                 </header>
-                <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
+                <div className="flex flex-1 flex-col gap-4 p-4">
                     <div className="flex-1 space-y-6">
                         <div>
                             <h2 className="text-2xl font-semibold tracking-tight">API Providers</h2>
