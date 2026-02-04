@@ -6,13 +6,14 @@ import { Handle, Position, NodeProps } from '@xyflow/react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
-import { Image as ImageIcon, Loader2, AlertCircle, Download } from 'lucide-react'
+import { Image as ImageIcon, Download } from 'lucide-react'
 import { experimental_generateImage as generateImage } from 'ai'
 import { createGoogleGenerativeAI } from '@ai-sdk/google'
 import { getGoogleApiKey } from '@/lib/utils/api-keys'
 import { z } from 'zod'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ImageModelNode } from './image-model-node'
+import { downloadMedia } from '@/lib/utils/download'
 
 const inputSchema = z.object({
     prompt: z.string().min(1, 'Prompt is required'),
@@ -132,11 +133,7 @@ export const ImagenNode = memo(({ data, selected, id }: NodeProps) => {
     };
 
     const handleDownload = () => {
-        if (!imageUrl) return;
-        const link = document.createElement('a');
-        link.href = imageUrl;
-        link.download = `imagen-${Date.now()}.png`;
-        link.click();
+        downloadMedia(imageUrl, `imagen-${Date.now()}.png`);
     };
 
     return (

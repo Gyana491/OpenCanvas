@@ -12,6 +12,7 @@ import { z } from 'zod'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ImageModelNode } from './image-model-node'
 import { resolveImageInput } from '@/lib/utils/image-processing'
+import { downloadMedia } from '@/lib/utils/download'
 
 const inputSchema = z.object({
     prompt: z.string().min(1, 'Prompt is required'),
@@ -258,11 +259,7 @@ export const NanoBananaNode = memo(({ data, selected, id }: NodeProps) => {
     };
 
     const handleDownload = () => {
-        if (!output) return;
-        const link = document.createElement('a');
-        link.href = output;
-        link.download = `nano-banana-${Date.now()}.png`;
-        link.click();
+        downloadMedia(output, `nano-banana-${Date.now()}.png`);
     };
 
     return (

@@ -12,6 +12,7 @@ import { z } from 'zod'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { VideoModelNode } from './video-model-node'
 import { resolveImageInput } from '@/lib/utils/image-processing'
+import { downloadMedia } from '@/lib/utils/download'
 
 const inputSchema = z.object({
     prompt: z.string().min(1, 'Prompt is required'),
@@ -365,11 +366,7 @@ export const Veo3Node = memo(({ data, selected, id }: NodeProps) => {
     };
 
     const handleDownload = () => {
-        if (!output) return;
-        const link = document.createElement('a');
-        link.href = output;
-        link.download = `veo-3.1-${Date.now()}.mp4`;
-        link.click();
+        downloadMedia(output, `veo-3.1-${Date.now()}.mp4`);
     };
 
     return (
