@@ -25,7 +25,6 @@ import { toast } from 'sonner'
 import { toPng } from 'html-to-image'
 
 import { ExportDialog } from './export-dialog'
-import { ImportDialog, importWorkflowAction } from './import-dialog'
 
 
 import { Button } from "@/components/ui/button"
@@ -406,26 +405,6 @@ function WorkflowEditorInner() {
     }
   }, [nodes, edges, currentWorkflowId, isLoading, getViewport, getSerializableGraph])
 
-  // Listen for save-before-import event from global drop handler
-  useEffect(() => {
-    const handleSaveBeforeImport = async (event: any) => {
-      const { workflowId } = event.detail;
-      if (workflowId === currentWorkflowId && currentWorkflowId && window.electron) {
-        try {
-          const viewport = getViewport();
-          const { nodes: safeNodes, edges: safeEdges } = getSerializableGraph(nodes, edges);
-          const thumbnailBuffer = await generateThumbnail();
-          await window.electron.saveWorkflow(currentWorkflowId, safeNodes, safeEdges, viewport, thumbnailBuffer);
-          console.log('[Workflow Editor] Saved workflow before import:', currentWorkflowId);
-        } catch (error) {
-          console.error('[Workflow Editor] Failed to save before import:', error);
-        }
-      }
-    };
-
-    window.addEventListener('save-before-import', handleSaveBeforeImport);
-    return () => window.removeEventListener('save-before-import', handleSaveBeforeImport);
-  }, [currentWorkflowId, getViewport, getSerializableGraph, nodes, edges, generateThumbnail])
 
   // Generate thumbnail after workflow loads (for imported workflows)
   useEffect(() => {
@@ -650,30 +629,6 @@ function WorkflowEditorInner() {
     (event: React.DragEvent) => {
       event.preventDefault()
 
-      // Check for file drops
-      if (event.dataTransfer.files && event.dataTransfer.files.length > 0) {
-        const file = event.dataTransfer.files[0]
-        if (file.name.endsWith('.json') || file.name.endsWith('.zip')) {
-          // Create beforeImport callback to save current workflow
-          const beforeImport = async () => {
-            if (currentWorkflowId && window.electron) {
-              try {
-                const viewport = getViewport()
-                const { nodes: safeNodes, edges: safeEdges } = getSerializableGraph(nodes, edges)
-                const thumbnailBuffer = await generateThumbnail()
-                await window.electron.saveWorkflow(currentWorkflowId, safeNodes, safeEdges, viewport, thumbnailBuffer)
-                console.log('[Workflow Editor] Saved workflow before import')
-              } catch (error) {
-                console.error('[Workflow Editor] Failed to save before import:', error)
-              }
-            }
-          }
-
-          importWorkflowAction(file, router.navigate, setNodes, setEdges, setViewport, beforeImport)
-          return
-        }
-      }
-
       const nodeType = event.dataTransfer.getData('application/reactflow')
       if (!nodeType) {
         return
@@ -728,7 +683,7 @@ function WorkflowEditorInner() {
 
       setNodes((nds) => [...nds, newNode])
     },
-    [screenToFlowPosition, setNodes, updateNodeData, router.navigate, setEdges, setViewport, currentWorkflowId, getViewport, getSerializableGraph, nodes, edges, generateThumbnail]
+    [screenToFlowPosition, setNodes, updateNodeData]
   )
 
   const onNodeClick = useCallback((_: React.MouseEvent, node: any) => {
