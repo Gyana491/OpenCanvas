@@ -938,18 +938,20 @@ function WorkflowEditorInner() {
           </div>
         )}
 
-        {/* Top Right Action Bar */}
-        <div className={`absolute top-4 right-4 z-50 flex gap-2 transition-all duration-300 ${isRightSidebarOpen ? 'mr-80' : ''}`}>
-          <Button
-            variant="outline"
-            size="sm"
-            className="shadow-sm bg-background/80 backdrop-blur-sm h-9 px-4"
-            onClick={() => setIsExportDialogOpen(true)}
-          >
-            <Download className="mr-2 h-4 w-4" />
-            Export
-          </Button>
-        </div>
+        {/* Top Right Action Bar - Hidden when properties sidebar is open */}
+        {!isRightSidebarOpen && (
+          <div className="absolute top-4 right-4 z-50 flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="shadow-sm bg-background/80 backdrop-blur-sm h-9 px-4"
+              onClick={() => setIsExportDialogOpen(true)}
+            >
+              <Download className="mr-2 h-4 w-4" />
+              Export
+            </Button>
+          </div>
+        )}
 
         <ReactFlow
           nodes={nodes}
