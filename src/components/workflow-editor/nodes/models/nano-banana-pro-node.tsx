@@ -1,6 +1,7 @@
 "use client"
 
 import { memo, useState, useEffect } from 'react'
+import { useParams } from '@tanstack/react-router'
 import { Handle, Position, NodeProps, useUpdateNodeInternals, useReactFlow, useEdges } from '@xyflow/react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -11,6 +12,7 @@ import { z } from 'zod'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { ImageModelNode } from './image-model-node'
+import { resolveImageInput } from '@/lib/utils/image-processing'
 
 const inputSchema = z.object({
     prompt: z.string().min(1, 'Prompt is required'),
@@ -19,8 +21,17 @@ const inputSchema = z.object({
 });
 
 export const NanoBananaProNode = memo(({ data, selected, id }: NodeProps) => {
+    const { id: workflowId } = useParams({ from: '/editor/$id' })
     const [isRunning, setIsRunning] = useState(false);
-    const [output, setOutput] = useState<string>('');
+
+    const getInitialImage = () => {
+        if (data?.assetPath && workflowId) {
+            return `opencanvas://${workflowId}/${data.assetPath}`
+        }
+        return (data?.output as string) || (data?.imageUrl as string) || ''
+    }
+
+    const [output, setOutput] = useState<string>(getInitialImage());
     const [error, setError] = useState<string>('');
     const [thinkingOutput, setThinkingOutput] = useState<string>('');
 
@@ -75,6 +86,13 @@ export const NanoBananaProNode = memo(({ data, selected, id }: NodeProps) => {
         updateNodeInternals(id);
     }, [imageInputCount, id, updateNodeInternals]);
 
+    // Update image URL when data changes (e.g. on load)
+    useEffect(() => {
+        if (!isRunning) {
+            setOutput(getInitialImage())
+        }
+    }, [data?.assetPath, data?.output, data?.imageUrl, workflowId])
+
     const handleAddInput = () => {
         if (data?.onUpdateNodeData) {
             const newCount = imageInputCount + 1;
@@ -126,16 +144,18 @@ export const NanoBananaProNode = memo(({ data, selected, id }: NodeProps) => {
             for (let i = 0; i < imageInputCount; i++) {
                 const connectedImage = freshImages[`image_${i}`];
                 if (connectedImage) {
-                    const match = connectedImage.match(/^data:(image\/[a-z]+);base64,/);
-                    const mimeType = match ? match[1] : 'image/png';
-                    const base64Data = connectedImage.includes(',') ? connectedImage.split(',')[1] : connectedImage;
-
-                    contentsParts.push({
-                        inlineData: {
-                            mimeType: mimeType,
-                            data: base64Data
-                        }
-                    });
+                    try {
+                        const { mimeType, base64Data } = await resolveImageInput(connectedImage);
+                        contentsParts.push({
+                            inlineData: {
+                                mimeType: mimeType,
+                                data: base64Data
+                            }
+                        });
+                    } catch (e) {
+                        console.error(`Failed to resolve image input ${i}`, e);
+                        // continue
+                    }
                 }
             }
 
@@ -207,8 +227,39 @@ export const NanoBananaProNode = memo(({ data, selected, id }: NodeProps) => {
 
                 setOutput(imageUrl);
 
+                let assetPathStr = '';
+                if (workflowId) {
+                    try {
+                        const response = await fetch(imageUrl);
+                        const buffer = await response.arrayBuffer();
+                        const ext = mimeType.split('/')[1] || 'png';
+                        const fileName = `nano_banana_pro_${Date.now()}.${ext}`;
+
+                        const saveResponse = await window.electron.saveAsset(
+                            workflowId,
+                            id,
+                            // @ts-ignore
+                            buffer,
+                            fileName,
+                            'image',
+                            mimeType
+                        );
+                        if (saveResponse.success && saveResponse.data) {
+                            assetPathStr = saveResponse.data.filePath;
+                            console.log('[NanoBananaPro] Saved asset:', assetPathStr);
+                        }
+                    } catch (e) { console.error('Failed to save asset', e) }
+                }
+
                 if (data?.onUpdateNodeData && typeof data.onUpdateNodeData === 'function') {
-                    (data.onUpdateNodeData as (id: string, data: any) => void)(id, { output: imageUrl });
+                    const persistentOutput = assetPathStr && workflowId
+                        ? `opencanvas://${workflowId}/${assetPathStr}`
+                        : imageUrl;
+
+                    (data.onUpdateNodeData as (id: string, data: any) => void)(id, {
+                        output: persistentOutput,
+                        assetPath: assetPathStr
+                    });
                 }
             } else {
                 console.error('[API Response Error]', {

@@ -115,7 +115,9 @@ function registerProtocol() {
       const homeDir = app.getPath('home');
       const filePath = path.join(homeDir, '.opencanvas', `opencanvas_${workflowId}`, 'assets', filename);
 
-      return net.fetch(`file://${filePath}`);
+      return net.fetch(`file://${filePath}`, {
+        headers: request.headers
+      });
     } catch (error) {
       console.error("Protocol error:", error);
       return new Response("Internal Server Error", { status: 500 });
@@ -149,7 +151,8 @@ protocol.registerSchemesAsPrivileged([
       secure: true,
       supportFetchAPI: true,
       corsEnabled: true,
-      bypassCSP: true
+      bypassCSP: true,
+      stream: true
     }
   }
 ])

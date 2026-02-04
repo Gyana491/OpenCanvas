@@ -1,6 +1,7 @@
 "use client"
 
 import { memo, useState, useEffect } from 'react'
+import { useParams } from '@tanstack/react-router'
 import { Handle, Position, NodeProps, useUpdateNodeInternals, useReactFlow, useEdges } from '@xyflow/react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -10,6 +11,7 @@ import { getGoogleApiKey } from '@/lib/utils/api-keys'
 import { z } from 'zod'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { VideoModelNode } from './video-model-node'
+import { resolveImageInput } from '@/lib/utils/image-processing'
 
 const inputSchema = z.object({
     prompt: z.string().min(1, 'Prompt is required'),
@@ -22,8 +24,17 @@ const inputSchema = z.object({
 });
 
 export const Veo3Node = memo(({ data, selected, id }: NodeProps) => {
+    const { id: workflowId } = useParams({ from: '/editor/$id' })
     const [isRunning, setIsRunning] = useState(false);
-    const [output, setOutput] = useState<string>('');
+
+    const getInitialVideo = () => {
+        if (data?.assetPath && workflowId) {
+            return `opencanvas://${workflowId}/${data.assetPath}`
+        }
+        return (data?.output as string) || ''
+    }
+
+    const [output, setOutput] = useState<string>(getInitialVideo());
     const [error, setError] = useState<string>('');
     const [progress, setProgress] = useState<string>('');
 
@@ -92,6 +103,13 @@ export const Veo3Node = memo(({ data, selected, id }: NodeProps) => {
     useEffect(() => {
         updateNodeInternals(id);
     }, [imageInputCount, id, updateNodeInternals]);
+
+    // Update video URL when data changes (e.g. on load)
+    useEffect(() => {
+        if (!isRunning) {
+            setOutput(getInitialVideo())
+        }
+    }, [data?.assetPath, data?.output, workflowId])
 
     const handleAddInput = () => {
         if (data?.onUpdateNodeData) {
@@ -203,14 +221,16 @@ export const Veo3Node = memo(({ data, selected, id }: NodeProps) => {
 
             // Add first frame image if connected
             if (freshImages['image']) {
-                const match = freshImages['image'].match(/^data:(image\/[a-z]+);base64,/);
-                const mimeType = match ? match[1] : 'image/png';
-                const base64Data = freshImages['image'].includes(',') ? freshImages['image'].split(',')[1] : freshImages['image'];
-
-                requestBody.instances[0].image = {
-                    bytesBase64Encoded: base64Data,
-                    mimeType: mimeType
-                };
+                try {
+                    const { mimeType, base64Data } = await resolveImageInput(freshImages['image']);
+                    requestBody.instances[0].image = {
+                        bytesBase64Encoded: base64Data,
+                        mimeType: mimeType
+                    };
+                } catch (e) {
+                    console.error('Failed to resolve first frame image', e);
+                    throw new Error('Failed to load first frame image. Please check the input.');
+                }
             }
 
             // Add reference images if connected (up to 3)
@@ -218,15 +238,17 @@ export const Veo3Node = memo(({ data, selected, id }: NodeProps) => {
             for (let i = 0; i < imageInputCount; i++) {
                 const connectedImage = freshImages[`ref_image_${i}`];
                 if (connectedImage) {
-                    const match = connectedImage.match(/^data:(image\/[a-z]+);base64,/);
-                    const mimeType = match ? match[1] : 'image/png';
-                    const base64Data = connectedImage.includes(',') ? connectedImage.split(',')[1] : connectedImage;
-
-                    referenceImages.push({
-                        bytesBase64Encoded: base64Data,
-                        mimeType: mimeType,
-                        referenceType: "asset"
-                    });
+                    try {
+                        const { mimeType, base64Data } = await resolveImageInput(connectedImage);
+                        referenceImages.push({
+                            bytesBase64Encoded: base64Data,
+                            mimeType: mimeType,
+                            referenceType: "asset"
+                        });
+                    } catch (e) {
+                        console.error(`Failed to resolve ref image ${i}`, e);
+                        // Continue or throw? Maybe continue but warn
+                    }
                 }
             }
 
@@ -291,10 +313,44 @@ export const Veo3Node = memo(({ data, selected, id }: NodeProps) => {
             const videoUrl = URL.createObjectURL(videoBlob);
 
             setOutput(videoUrl);
+
+            let assetPathStr = '';
+
+            if (workflowId) {
+                try {
+                    const buffer = await videoBlob.arrayBuffer();
+                    const fileName = `veo3_${Date.now()}.mp4`;
+
+                    const saveResponse = await window.electron.saveAsset(
+                        workflowId,
+                        id,
+                        // @ts-ignore
+                        buffer,
+                        fileName,
+                        'video',
+                        'video/mp4'
+                    );
+
+                    if (saveResponse.success && saveResponse.data) {
+                        assetPathStr = saveResponse.data.filePath;
+                    }
+                } catch (e) {
+                    console.error('Failed to save video asset', e);
+                }
+            }
+
             setProgress('');
 
+            // Use protocol URL for persistent storage if available
+            const persistentOutput = assetPathStr && workflowId
+                ? `opencanvas://${workflowId}/${assetPathStr}`
+                : videoUrl;
+
             if (data?.onUpdateNodeData && typeof data.onUpdateNodeData === 'function') {
-                (data.onUpdateNodeData as (id: string, data: any) => void)(id, { output: videoUrl });
+                (data.onUpdateNodeData as (id: string, data: any) => void)(id, {
+                    output: persistentOutput,
+                    assetPath: assetPathStr
+                });
             }
         } catch (err) {
             if (err instanceof z.ZodError) {

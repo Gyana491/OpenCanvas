@@ -1,6 +1,7 @@
 "use client"
 
-import { memo, useState } from 'react'
+import { memo, useState, useEffect } from 'react'
+import { useParams } from '@tanstack/react-router'
 import { Handle, Position, NodeProps } from '@xyflow/react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -19,12 +20,28 @@ const inputSchema = z.object({
 });
 
 export const ImagenNode = memo(({ data, selected, id }: NodeProps) => {
+    const { id: workflowId } = useParams({ from: '/editor/$id' })
     const [isRunning, setIsRunning] = useState(false);
-    const [imageUrl, setImageUrl] = useState<string>('');
+
+    const getInitialImage = () => {
+        if (data?.assetPath && workflowId) {
+            return `opencanvas://${workflowId}/${data.assetPath}`
+        }
+        return (data?.output as string) || (data?.imageUrl as string) || ''
+    }
+
+    const [imageUrl, setImageUrl] = useState<string>(getInitialImage());
     const [error, setError] = useState<string>('');
 
     const prompt = (data?.connectedPrompt as string) || (data?.prompt as string) || '';
     const aspectRatio = (data?.aspectRatio as string) || '1:1';
+
+    // Update image URL when data changes (e.g. on load)
+    useEffect(() => {
+        if (!isRunning) {
+            setImageUrl(getInitialImage())
+        }
+    }, [data?.assetPath, data?.output, data?.imageUrl, workflowId])
 
     const inputs = (data?.inputs || [
         { id: 'prompt', label: 'Prompt', type: 'text', required: true }
@@ -61,8 +78,47 @@ export const ImagenNode = memo(({ data, selected, id }: NodeProps) => {
             const imageDataUrl = `data:image/png;base64,${image.base64}`;
             setImageUrl(imageDataUrl);
 
+            let assetPathStr = '';
+
+            // Save to assets if in workflow
+            if (workflowId) {
+                try {
+                    // Convert base64 to buffer
+                    const response = await fetch(imageDataUrl);
+                    const buffer = await response.arrayBuffer();
+
+                    const fileName = `imagen_${Date.now()}.png`;
+
+                    const saveResponse = await window.electron.saveAsset(
+                        workflowId,
+                        id,
+                        // @ts-ignore - Electron IPC handles ArrayBuffer
+                        buffer,
+                        fileName,
+                        'image',
+                        'image/png'
+                    );
+
+                    if (saveResponse.success && saveResponse.data) {
+                        assetPathStr = saveResponse.data.filePath;
+                        console.log('Saved asset to:', assetPathStr);
+                    }
+                } catch (saveError) {
+                    console.error('Failed to save asset:', saveError);
+                }
+            }
+
+            // If we have an asset path, construct the protocol URL for the node data
+            // This ensures the JSON is small (just a string URL) instead of full base64
+            const persistentOutput = assetPathStr && workflowId
+                ? `opencanvas://${workflowId}/${assetPathStr}`
+                : imageDataUrl;
+
             if (data?.onUpdateNodeData && typeof data.onUpdateNodeData === 'function') {
-                (data.onUpdateNodeData as (id: string, data: any) => void)(id, { output: imageDataUrl });
+                (data.onUpdateNodeData as (id: string, data: any) => void)(id, {
+                    output: persistentOutput,
+                    assetPath: assetPathStr
+                });
             }
         } catch (err) {
             if (err instanceof z.ZodError) {
