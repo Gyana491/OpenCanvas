@@ -9,6 +9,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
+import {
   Search,
   Layers,
   ArrowLeft,
@@ -19,7 +24,9 @@ import {
   Share2,
   Settings,
   ChevronRight,
+  ChevronDown,
   Save,
+  Workflow,
 } from "lucide-react"
 import { useNavigate } from "@tanstack/react-router"
 
@@ -41,15 +48,9 @@ export function EditorSidebar({ onSearchClick, onLayersClick, onSave, onBackToDa
       <div className="flex h-14 items-center justify-center border-b">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-9 w-9">
-              <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-primary-foreground">
-                <div className="grid grid-cols-2 gap-0.5">
-                  <div className="h-1.5 w-1.5 bg-current" />
-                  <div className="h-1.5 w-1.5 bg-current" />
-                  <div className="h-1.5 w-1.5 bg-current" />
-                  <div className="h-1.5 w-1.5 bg-current" />
-                </div>
-              </div>
+            <Button variant="ghost" size="icon" className="h-10 w-10 gap-1 data-[state=open]:bg-accent px-0">
+              <Workflow className="size-5" />
+              <ChevronDown className="size-3 text-muted-foreground" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-56">
@@ -97,33 +98,47 @@ export function EditorSidebar({ onSearchClick, onLayersClick, onSave, onBackToDa
 
       {/* Only Search and Layers icons */}
       <div className="flex flex-col items-center gap-1 py-3">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-9 w-9"
-          onClick={onSearchClick}
-          title="Search Nodes"
-        >
-          <Search className="h-4 w-4" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className={`h-9 w-9 ${isLibraryOpen ? 'bg-accent text-accent-foreground' : ''}`}
-          onClick={onLayersClick}
-          title="Node Library"
-        >
-          <Layers className="h-4 w-4" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-9 w-9"
-          onClick={onSave}
-          title="Save (Cmd+S)"
-        >
-          <Save className="h-4 w-4" />
-        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9"
+              onClick={onSearchClick}
+            >
+              <Search className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="right">Search Nodes</TooltipContent>
+        </Tooltip>
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className={`h-9 w-9 ${isLibraryOpen ? 'bg-accent text-accent-foreground' : ''}`}
+              onClick={onLayersClick}
+            >
+              <Layers className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="right">Node Library</TooltipContent>
+        </Tooltip>
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9"
+              onClick={onSave}
+            >
+              <Save className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="right">Save (Cmd+S)</TooltipContent>
+        </Tooltip>
       </div>
     </div>
   )
