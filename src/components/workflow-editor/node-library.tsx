@@ -1,5 +1,6 @@
 "use client"
 
+import React from "react"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -11,6 +12,8 @@ interface NodeLibraryProps {
   onAddNode: (nodeType: string) => void
   onClose: () => void
   isOpen: boolean
+  workflowName?: string
+  onRename?: (newName: string) => void
 }
 
 const nodeCategories: {
@@ -82,7 +85,22 @@ const nodeCategories: {
     },
   ]
 
-export function NodeLibrary({ onAddNode, onClose, isOpen }: NodeLibraryProps) {
+export function NodeLibrary({ onAddNode, onClose, isOpen, workflowName, onRename }: NodeLibraryProps) {
+  const [isEditingName, setIsEditingName] = React.useState(false)
+  const [localName, setLocalName] = React.useState(workflowName || "")
+
+  React.useEffect(() => {
+    setLocalName(workflowName || "")
+  }, [workflowName])
+
+  const handleNameSave = () => {
+    if (!onRename) return
+    const nameToSave = localName.trim() || "Untitled Workflow"
+    onRename(nameToSave)
+    setLocalName(nameToSave)
+    setIsEditingName(false)
+  }
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -94,13 +112,34 @@ export function NodeLibrary({ onAddNode, onClose, isOpen }: NodeLibraryProps) {
           className="w-64 border-r bg-background absolute left-0 top-0 bottom-0 z-40 shadow-lg flex flex-col"
         >
           <div className="px-3 py-2 border-b">
-            <div className="flex items-center justify-between mb-2">
-              <h2 className="text-sm font-semibold">Models</h2>
+            <div className="flex items-center justify-between mb-2 h-8">
+              {isEditingName ? (
+                <Input
+                  value={localName}
+                  onChange={(e) => setLocalName(e.target.value)}
+                  onBlur={handleNameSave}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleNameSave()
+                    }
+                  }}
+                  className="h-7 px-2 text-sm font-semibold w-[180px]"
+                  autoFocus
+                />
+              ) : (
+                <h2
+                  className="text-sm font-semibold cursor-text truncate max-w-[180px] hover:text-muted-foreground transition-colors"
+                  onClick={() => setIsEditingName(true)}
+                  title="Click to rename"
+                >
+                  {localName || "Untitled Workflow"}
+                </h2>
+              )}
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={onClose}
-                className="h-6 w-6"
+                className="h-6 w-6 ml-auto"
               >
                 <X className="h-3.5 w-3.5" />
               </Button>

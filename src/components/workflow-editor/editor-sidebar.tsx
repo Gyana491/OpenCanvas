@@ -21,12 +21,12 @@ import {
   FolderOpen as FolderIcon,
   Copy,
   Edit3,
-  Share2,
-  Settings,
   ChevronRight,
   ChevronDown,
   Save,
   Workflow,
+  Download,
+  Trash2,
 } from "lucide-react"
 import { useNavigate } from "@tanstack/react-router"
 
@@ -36,10 +36,26 @@ interface EditorSidebarProps {
   onLayersClick?: () => void
   onSave?: () => void
   onBackToDashboard?: () => void
+  onDuplicate?: () => void
+  onRename?: () => void
+  onExport?: () => void
+  onDelete?: () => void
+  onNew?: () => void
   isLibraryOpen?: boolean
 }
 
-export function EditorSidebar({ onSearchClick, onLayersClick, onSave, onBackToDashboard, isLibraryOpen }: EditorSidebarProps) {
+export function EditorSidebar({
+  onSearchClick,
+  onLayersClick,
+  onSave,
+  onBackToDashboard,
+  onDuplicate,
+  onRename,
+  onExport,
+  onDelete,
+  onNew,
+  isLibraryOpen
+}: EditorSidebarProps) {
   const navigate = useNavigate()
 
   return (
@@ -64,33 +80,27 @@ export function EditorSidebar({ onSearchClick, onLayersClick, onSave, onBackToDa
               Save
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
+            <DropdownMenuItem onClick={onNew}>
               <FileText className="mr-2 h-4 w-4" />
               New File
             </DropdownMenuItem>
-            <DropdownMenuItem>
-              <FolderIcon className="mr-2 h-4 w-4 shrink-0" />
-              <span>Open Recent</span>
-              <ChevronRight className="ml-auto h-4 w-4" />
-            </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
+            <DropdownMenuItem onClick={onDuplicate}>
               <Copy className="mr-2 h-4 w-4" />
               Duplicate
             </DropdownMenuItem>
-            <DropdownMenuItem>
+            <DropdownMenuItem onClick={onRename}>
               <Edit3 className="mr-2 h-4 w-4" />
               Rename
             </DropdownMenuItem>
-            <DropdownMenuItem>
-              <Share2 className="mr-2 h-4 w-4" />
-              Share
+            <DropdownMenuItem onClick={onExport}>
+              <Download className="mr-2 h-4 w-4" />
+              Export
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
-              <Settings className="mr-2 h-4 w-4 shrink-0" />
-              <span>Preferences</span>
-              <ChevronRight className="ml-auto h-4 w-4" />
+            <DropdownMenuItem onClick={onDelete} className="text-destructive focus:text-destructive hover:text-destructive">
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

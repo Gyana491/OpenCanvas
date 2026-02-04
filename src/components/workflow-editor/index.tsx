@@ -28,6 +28,16 @@ import { ExportDialog } from './export-dialog'
 
 
 import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { EditorSidebar } from './editor-sidebar'
 import { NodeLibrary } from './node-library'
 import { NodeProperties } from './node-properties'
@@ -239,6 +249,10 @@ function WorkflowEditorInner() {
   const [currentWorkflowId, setCurrentWorkflowId] = useState<string | null>(null)
   const { screenToFlowPosition, setViewport, getViewport } = useReactFlow()
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false)
+  const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false)
+  const [isEditingName, setIsEditingName] = useState(false)
+  const [newName, setNewName] = useState("")
+  const [workflowName, setWorkflowName] = useState("")
   const [shouldGenerateThumbnail, setShouldGenerateThumbnail] = useState(false)
 
   // Auto-save timer ref
@@ -273,6 +287,7 @@ function WorkflowEditorInner() {
             setCurrentWorkflowId(response.data.id)
             // Navigate to the new workflow ID using router
             router.navigate({ to: '/editor/$id', params: { id: response.data.id } })
+            toast.success('New file created successfully')
           } else {
             console.error('[Workflow Editor] Failed to create workflow:', response.error)
           }
@@ -287,6 +302,7 @@ function WorkflowEditorInner() {
             })
 
             setCurrentWorkflowId(workflowId)
+            setWorkflowName(response.data.name)
             setNodes(loadedNodes as Node<WorkflowNodeData>[])
             setEdges(loadedEdges)
             if (viewport) {
@@ -311,9 +327,7 @@ function WorkflowEditorInner() {
     }
 
     loadWorkflowData()
-    // Only run on mount
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [workflowId, router])
 
   // Helper to sanitize nodes for saving (remove functions)
   const getSerializableGraph = useCallback((nodes: Node[], edges: Edge[]) => {
@@ -788,6 +802,92 @@ function WorkflowEditorInner() {
     router.navigate({ to: '/' })
   }, [currentWorkflowId, getViewport, getSerializableGraph, nodes, edges, generateThumbnail, router])
 
+  const handleDuplicate = async () => {
+    if (!currentWorkflowId || !window.electron) return
+    try {
+      const response = await window.electron.duplicateWorkflow(currentWorkflowId)
+      if (response.success && response.data) {
+        toast.success('Workflow duplicated')
+        router.navigate({ to: '/editor/$id', params: { id: response.data.id } })
+      } else {
+        toast.error('Failed to duplicate workflow')
+      }
+    } catch (err) {
+      toast.error('Error duplicating workflow')
+    }
+  }
+
+  const handleRenameSubmit = async () => {
+    if (!currentWorkflowId || !newName.trim() || !window.electron) return
+    try {
+      const response = await window.electron.renameWorkflow(currentWorkflowId, newName)
+      if (response.success) {
+        toast.success("Workflow renamed successfully")
+        setWorkflowName(newName)
+        setIsRenameDialogOpen(false)
+      } else {
+        toast.error('Failed to rename workflow')
+      }
+    } catch (error) {
+      toast.error('Failed to rename workflow')
+    }
+  }
+
+  const handleTitleSave = async (customName?: string) => {
+    if (!currentWorkflowId || !window.electron) return
+
+    // Use custom name (from sidebar) or current state (from canvas input)
+    const nameToUse = customName !== undefined ? customName : workflowName
+    const nameToSave = nameToUse.trim() || "Untitled Workflow"
+
+    try {
+      const response = await window.electron.renameWorkflow(currentWorkflowId, nameToSave)
+      if (response.success) {
+        setIsEditingName(false)
+        setWorkflowName(nameToSave)
+        toast.success("Workflow renamed")
+      } else {
+        toast.error('Failed to rename workflow')
+      }
+    } catch (error) {
+      toast.error('Failed to rename workflow')
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!currentWorkflowId || !window.electron) return
+    if (!confirm('Are you sure you want to delete this workflow? This cannot be undone.')) return
+    try {
+      const response = await window.electron.deleteWorkflow(currentWorkflowId)
+      if (response.success) {
+        toast.success('Workflow deleted')
+        router.navigate({ to: '/' })
+      } else {
+        toast.error('Failed to delete workflow')
+      }
+    } catch (error) {
+      toast.error('Failed to delete workflow')
+    }
+  }
+
+  const handleNew = useCallback(async () => {
+    // Auto-save before creating new
+    if (currentWorkflowId && window.electron && nodes.length > 0) {
+      try {
+        const viewport = getViewport()
+        const { nodes: safeNodes, edges: safeEdges } = getSerializableGraph(nodes, edges)
+        const thumbnailBuffer = await generateThumbnail()
+
+        await window.electron.saveWorkflow(currentWorkflowId, safeNodes, safeEdges, viewport, thumbnailBuffer)
+        console.log('[Workflow Editor] Auto-saved before creating new project')
+      } catch (error) {
+        console.error('[Workflow Editor] Auto-save before new project failed:', error)
+        toast.error('Failed to save current workflow')
+      }
+    }
+    router.navigate({ to: '/editor/$id', params: { id: 'new' } })
+  }, [currentWorkflowId, getViewport, getSerializableGraph, nodes, edges, generateThumbnail, router])
+
   return (
     <div className="flex h-screen w-full bg-background">
       {/* Minimal left sidebar with logo, search, layers - always visible */}
@@ -796,11 +896,48 @@ function WorkflowEditorInner() {
         onLayersClick={() => setIsLibraryOpen(!isLibraryOpen)}
         onSave={handleManualSave}
         onBackToDashboard={handleBackToDashboard}
+        onDuplicate={handleDuplicate}
+        onRename={() => {
+          setNewName(workflowName)
+          setIsRenameDialogOpen(true)
+        }}
+        onExport={() => setIsExportDialogOpen(true)}
+        onDelete={handleDelete}
+        onNew={handleNew}
         isLibraryOpen={isLibraryOpen}
       />
 
       {/* Full width canvas area */}
       <div className="flex-1 relative">
+        {/* Top Left Title Bar - Hidden when library is open */}
+        {!isLibraryOpen && (
+          <div className="absolute top-4 left-4 z-50">
+            <div className="bg-background/80 backdrop-blur-sm border shadow-sm rounded-md px-4 h-9 flex items-center min-w-[200px]">
+              {isEditingName ? (
+                <Input
+                  value={workflowName}
+                  onChange={(e) => setWorkflowName(e.target.value)}
+                  onBlur={() => handleTitleSave()}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleTitleSave()
+                    }
+                  }}
+                  className="h-7 px-2 border-none focus-visible:ring-0 bg-transparent text-foreground font-medium"
+                  autoFocus
+                />
+              ) : (
+                <span
+                  onClick={() => setIsEditingName(true)}
+                  className="font-medium cursor-text w-full truncate text-foreground hover:text-foreground/80 transition-colors"
+                >
+                  {workflowName || "Untitled Workflow"}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Top Right Action Bar */}
         <div className={`absolute top-4 right-4 z-50 flex gap-2 transition-all duration-300 ${isRightSidebarOpen ? 'mr-80' : ''}`}>
           <Button
@@ -855,6 +992,8 @@ function WorkflowEditorInner() {
           onAddNode={addNode}
           onClose={() => setIsLibraryOpen(false)}
           isOpen={isLibraryOpen}
+          workflowName={workflowName}
+          onRename={(newName) => handleTitleSave(newName)}
         />
 
         {/* Right sidebar for node properties */}
@@ -873,8 +1012,42 @@ function WorkflowEditorInner() {
           isOpen={isExportDialogOpen}
           onClose={() => setIsExportDialogOpen(false)}
           workflowId={currentWorkflowId}
-          workflowName={nodes.length > 0 ? "My Workflow" : "New Workflow"}
+          workflowName={workflowName || "Workflow"}
         />
+
+        {/* Rename Dialog */}
+        <Dialog open={isRenameDialogOpen} onOpenChange={setIsRenameDialogOpen}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Rename Workflow</DialogTitle>
+              <DialogDescription>
+                Enter a new name for your workflow.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="name" className="text-right">
+                  Name
+                </Label>
+                <Input
+                  id="name"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  className="col-span-3"
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleRenameSubmit()
+                    }
+                  }}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="submit" onClick={handleRenameSubmit}>Save changes</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   )
