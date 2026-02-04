@@ -230,4 +230,31 @@ export async function importProject(zipBuffer: Buffer): Promise<WorkflowData> {
     }
 }
 
+/**
+ * Duplicate a workflow
+ */
+export async function duplicateWorkflow(id: string): Promise<WorkflowData> {
+    try {
+        const workflow = await fileStorage.duplicateWorkflow(id)
+        console.log(`[Workflow Service] Duplicated workflow: ${id} -> ${workflow.id}`)
+        return workflow
+    } catch (error) {
+        console.error('[Workflow Service] Failed to duplicate workflow:', error)
+        throw error
+    }
+}
+
+/**
+ * Rename a workflow
+ */
+export async function renameWorkflow(id: string, name: string): Promise<void> {
+    try {
+        await fileStorage.updateWorkflowName(id, name)
+        console.log(`[Workflow Service] Renamed workflow: ${id} to ${name}`)
+    } catch (error) {
+        console.error('[Workflow Service] Failed to rename workflow:', error)
+        throw error
+    }
+}
+
 export * from './file-storage-service'

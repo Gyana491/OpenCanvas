@@ -86,6 +86,25 @@ declare global {
                 data?: any
                 error?: string
             }>
+
+            duplicateWorkflow: (id: string) => Promise<{
+                success: boolean
+                data?: {
+                    id: string
+                    name: string
+                    nodes: any[]
+                    edges: any[]
+                    viewport: { x: number; y: number; zoom: number }
+                    createdAt: Date
+                    updatedAt: Date
+                }
+                error?: string
+            }>
+
+            renameWorkflow: (id: string, name: string) => Promise<{
+                success: boolean
+                error?: string
+            }>
         }
     }
 }

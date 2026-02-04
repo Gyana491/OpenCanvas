@@ -133,5 +133,29 @@ export function registerWorkflowHandlers() {
         }
     })
 
+    // Duplicate workflow
+    ipcMain.handle('workflow:duplicate', async (_event, id: string) => {
+        try {
+            const { duplicateWorkflow } = await import('../services/workflow-service')
+            const workflow = await duplicateWorkflow(id)
+            return { success: true, data: workflow }
+        } catch (error) {
+            console.error('[IPC] workflow:duplicate error:', error)
+            return { success: false, error: (error as Error).message }
+        }
+    })
+
+    // Rename workflow
+    ipcMain.handle('workflow:rename', async (_event, id: string, name: string) => {
+        try {
+            const { renameWorkflow } = await import('../services/workflow-service')
+            await renameWorkflow(id, name)
+            return { success: true }
+        } catch (error) {
+            console.error('[IPC] workflow:rename error:', error)
+            return { success: false, error: (error as Error).message }
+        }
+    })
+
     console.log('[IPC] Workflow handlers registered')
 }

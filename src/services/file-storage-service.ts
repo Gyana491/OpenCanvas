@@ -293,6 +293,86 @@ export class FileStorageService {
         console.log(`[FileStorage] Imported workflow: ${newId}`)
         return newId
     }
+    /**
+     * Duplicate a workflow
+     */
+    async duplicateWorkflow(id: string): Promise<WorkflowData> {
+        const sourceDir = this.getWorkflowDir(id)
+        if (!await fs.pathExists(sourceDir)) {
+            throw new Error(`Workflow ${id} not found`)
+        }
+
+        const sourceWorkflow = await this.loadWorkflow(id)
+        if (!sourceWorkflow) {
+            throw new Error(`Failed to load workflow ${id} for duplication`)
+        }
+
+        const newId = nanoid()
+        const newWorkflowDir = this.getWorkflowDir(newId)
+        const now = new Date()
+
+        // Copy directory
+        await fs.copy(sourceDir, newWorkflowDir)
+
+        // Clean up copied files:
+        // 1. Rename workflow json
+        const sourceJsonPath = path.join(newWorkflowDir, `opencanvas_workflow_${id}.json`)
+        const legacyJsonPath = path.join(newWorkflowDir, 'workflow.json')
+        const newJsonPath = this.getWorkflowJsonPath(newId)
+
+        if (await fs.pathExists(sourceJsonPath)) {
+            await fs.move(sourceJsonPath, newJsonPath)
+        } else if (await fs.pathExists(legacyJsonPath)) {
+            // If it was a legacy file, we rename it to the new format
+            await fs.move(legacyJsonPath, newJsonPath)
+        }
+
+        // 2. Rename thumbnail if exists
+        const sourceThumbnailPath = path.join(newWorkflowDir, `opencanvas_thumbnail_${id}.png`)
+        const newThumbnailPath = path.join(newWorkflowDir, `opencanvas_thumbnail_${newId}.png`)
+
+        if (await fs.pathExists(sourceThumbnailPath)) {
+            await fs.move(sourceThumbnailPath, newThumbnailPath)
+        }
+
+        // Update JSON content
+        const newWorkflowData: WorkflowFileSchema = {
+            id: newId,
+            name: `Copy of ${sourceWorkflow.name}`,
+            nodes: sourceWorkflow.nodes,
+            edges: sourceWorkflow.edges,
+            viewport: sourceWorkflow.viewport,
+            createdAt: now.toISOString(),
+            updatedAt: now.toISOString()
+        }
+
+        await fs.writeJson(newJsonPath, newWorkflowData, { spaces: 2 })
+
+        console.log(`[FileStorage] Duplicated workflow: ${id} -> ${newId}`)
+
+        return {
+            ...newWorkflowData,
+            createdAt: now,
+            updatedAt: now,
+            thumbnail: sourceWorkflow.thumbnail // We return the memory buffer from source load
+        }
+    }
+
+    /**
+     * Update workflow name
+     */
+    async updateWorkflowName(id: string, name: string): Promise<void> {
+        const workflow = await this.loadWorkflow(id)
+        if (!workflow) {
+            throw new Error(`Workflow ${id} not found`)
+        }
+
+        workflow.name = name
+        workflow.updatedAt = new Date()
+
+        await this.saveWorkflow(workflow)
+        console.log(`[FileStorage] Renamed workflow: ${id} to "${name}"`)
+    }
 }
 
 export const fileStorage = new FileStorageService()

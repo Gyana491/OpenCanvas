@@ -34,4 +34,8 @@ contextBridge.exposeInMainWorld('electron', {
   exportProject: (id: string) => ipcRenderer.invoke('workflow:export', id),
 
   importProject: (zipBuffer: Buffer) => ipcRenderer.invoke('workflow:import', zipBuffer),
+
+  duplicateWorkflow: (id: string) => ipcRenderer.invoke('workflow:duplicate', id),
+
+  renameWorkflow: (id: string, name: string) => ipcRenderer.invoke('workflow:rename', id, name),
 });

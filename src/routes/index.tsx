@@ -1,10 +1,27 @@
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Plus, Search, Grid3x3, List, Trash2, FileText, Loader2, Package } from "lucide-react"
+import { Label } from "@/components/ui/label"
+import { Plus, Search, Grid3x3, List, Trash2, FileText, Loader2, Package, MoreHorizontal, MoreVertical, Pencil, Copy, Download } from "lucide-react"
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { AppSidebar } from "@/components/app-sidebar"
 import { ModeToggle } from "@/components/mode-toggle"
 import { ImportDialog } from "@/components/workflow-editor/import-dialog"
+import { DashboardExportDialog } from "@/components/workflow-editor/export-dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -51,6 +68,13 @@ function DashboardPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false)
+
+  const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false)
+  const [workflowToRename, setWorkflowToRename] = useState<{ id: string, name: string } | null>(null)
+  const [newName, setNewName] = useState("")
+
+  const [isExportDialogOpen, setIsExportDialogOpen] = useState(false)
+  const [workflowToExport, setWorkflowToExport] = useState<{ id: string, name: string } | null>(null)
 
   // Load workflows on mount
   useEffect(() => {
@@ -101,15 +125,68 @@ function DashboardPage() {
     try {
       const response = await window.electron.deleteWorkflow(id)
       if (response.success) {
+        toast.success("Workflow deleted successfully")
         // Reload workflows after deletion
         await loadWorkflows()
       } else {
         console.error('[Dashboard] Failed to delete workflow:', response.error)
-        alert('Failed to delete workflow')
+        toast.error('Failed to delete workflow')
       }
     } catch (error) {
       console.error('[Dashboard] Error deleting workflow:', error)
-      alert('Failed to delete workflow')
+      toast.error('Failed to delete workflow')
+    }
+  }
+
+  const handleDuplicateWorkflow = async (id: string) => {
+    if (!window.electron) return
+    try {
+      const response = await window.electron.duplicateWorkflow(id)
+      if (response.success) {
+        toast.success("Workflow duplicated successfully")
+        await loadWorkflows()
+      } else {
+        console.error('[Dashboard] Failed to duplicate:', response.error)
+        toast.error('Failed to duplicate workflow')
+      }
+    } catch (error) {
+      console.error('[Dashboard] Error duplicating workflow:', error)
+      toast.error('Failed to duplicate workflow')
+    }
+  }
+
+  const handleExportWorkflow = (id: string, name: string) => {
+    setWorkflowToExport({ id, name })
+    setIsExportDialogOpen(true)
+  }
+
+  const openRenameDialog = (workflow: WorkflowCardData) => {
+    setWorkflowToRename({ id: workflow.id, name: workflow.name })
+    setNewName(workflow.name)
+    setIsRenameDialogOpen(true)
+  }
+
+  const handleRenameSubmit = async () => {
+    if (!window.electron || !workflowToRename) return
+
+    if (!newName.trim()) {
+      toast.error("Name cannot be empty")
+      return
+    }
+
+    try {
+      const response = await window.electron.renameWorkflow(workflowToRename.id, newName)
+      if (response.success) {
+        toast.success("Workflow renamed successfully")
+        await loadWorkflows()
+        setIsRenameDialogOpen(false)
+      } else {
+        console.error('[Dashboard] Failed to rename:', response.error)
+        toast.error('Failed to rename workflow')
+      }
+    } catch (error) {
+      console.error('[Dashboard] Error renaming workflow:', error)
+      toast.error('Failed to rename workflow')
     }
   }
 
@@ -232,18 +309,41 @@ function DashboardPage() {
                           <div className="absolute inset-0 flex items-center justify-center hidden bg-gradient-to-br from-muted to-muted/80">
                             <FileText className="h-12 w-12 text-muted-foreground/50" />
                           </div>
-                          {/* Delete button overlay */}
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="absolute top-2 right-2 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity bg-background/80 hover:bg-destructive hover:text-destructive-foreground backdrop-blur-sm"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleDeleteWorkflow(workflow.id)
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          {/* Menu button overlay */}
+                          <div className="absolute top-2 right-2" onClick={(e) => e.stopPropagation()}>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 bg-background/80 hover:bg-background backdrop-blur-sm shadow-xs rounded-full"
+                                >
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => handleOpenWorkflow(workflow.id)}>
+                                  <FileText className="mr-2 h-4 w-4" /> Open
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => openRenameDialog(workflow)}>
+                                  <Pencil className="mr-2 h-4 w-4" /> Rename
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleDuplicateWorkflow(workflow.id)}>
+                                  <Copy className="mr-2 h-4 w-4" /> Duplicate
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleExportWorkflow(workflow.id, workflow.name)}>
+                                  <Download className="mr-2 h-4 w-4" /> Export
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  className="text-destructive focus:text-destructive"
+                                  onClick={() => handleDeleteWorkflow(workflow.id)}
+                                >
+                                  <Trash2 className="mr-2 h-4 w-4" /> Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
                         </div>
                         {/* Card content below image */}
                         <CardHeader className="pb-2">
@@ -298,17 +398,39 @@ function DashboardPage() {
                             <TableCell>{formatDistanceToNow(workflow.updatedAt, { addSuffix: true })}</TableCell>
                             <TableCell>{formatDistanceToNow(workflow.createdAt, { addSuffix: true })}</TableCell>
                             <TableCell>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-muted-foreground hover:text-destructive transition-colors"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleDeleteWorkflow(workflow.id)
-                                }}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-muted-foreground hover:text-foreground transition-colors"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleOpenWorkflow(workflow.id) }}>
+                                    <FileText className="mr-2 h-4 w-4" /> Open
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openRenameDialog(workflow) }}>
+                                    <Pencil className="mr-2 h-4 w-4" /> Rename
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleDuplicateWorkflow(workflow.id) }}>
+                                    <Copy className="mr-2 h-4 w-4" /> Duplicate
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleExportWorkflow(workflow.id, workflow.name) }}>
+                                    <Download className="mr-2 h-4 w-4" /> Export
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    className="text-destructive focus:text-destructive"
+                                    onClick={(e) => { e.stopPropagation(); handleDeleteWorkflow(workflow.id) }}
+                                  >
+                                    <Trash2 className="mr-2 h-4 w-4" /> Delete
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                             </TableCell>
                           </TableRow>
                         ))}
@@ -325,6 +447,47 @@ function DashboardPage() {
         isOpen={isImportDialogOpen}
         onClose={() => setIsImportDialogOpen(false)}
       />
+      <Dialog open={isRenameDialogOpen} onOpenChange={setIsRenameDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Rename Workflow</DialogTitle>
+            <DialogDescription>
+              Enter a new name for your workflow.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="name" className="text-right">
+                Name
+              </Label>
+              <Input
+                id="name"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                className="col-span-3"
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleRenameSubmit()
+                  }
+                }}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="submit" onClick={handleRenameSubmit}>Save changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {workflowToExport && (
+        <DashboardExportDialog
+          isOpen={isExportDialogOpen}
+          onClose={() => setIsExportDialogOpen(false)}
+          workflowId={workflowToExport.id}
+          workflowName={workflowToExport.name}
+        />
+      )}
     </SidebarProvider>
   )
 }
