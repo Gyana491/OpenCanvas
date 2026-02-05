@@ -53,14 +53,88 @@ async function installExtensions() {
   }
 }
 
+// ...
+import { autoUpdater, shell } from "electron";
+// ...
+
 function checkForUpdates() {
+  // 1. Setup AutoUpdater (Works best on Windows)
   updateElectronApp({
     updateSource: {
       type: UpdateSourceType.ElectronPublicUpdateService,
       repo: "Gyana491/OpenCanvas",
     },
+    logger: console
   });
+
+  // 2. Add Event Handlers to notify Frontend
+  autoUpdater.on('update-available', () => {
+    console.log('AutoUpdater: Update available');
+    ipcContext.mainWindow?.webContents.send('update-available', { source: 'auto' });
+  });
+
+  autoUpdater.on('update-downloaded', (event, releaseNotes, releaseName) => {
+    console.log('AutoUpdater: Update downloaded');
+    ipcContext.mainWindow?.webContents.send('update-downloaded', { releaseName });
+  });
+
+  autoUpdater.on('error', (message) => {
+    console.error('AutoUpdater Error:', message);
+    // Don't send error to UI, just fallback to manual check logic below if needed
+  });
+
+  // 3. Manual Check for macOS/Linux (or if AutoUpdater fails)
+  // We check GitHub API directly to see if there is a new version
+  if (process.platform !== 'win32') { // Windows handles it automatically above
+    // Delay slightly to ensure window is ready
+    setTimeout(() => {
+      const currentVersion = app.getVersion();
+      console.log(`[Update] Checking for updates... Current version: ${currentVersion}`);
+
+      const request = net.request('https://api.github.com/repos/Gyana491/OpenCanvas/releases/latest');
+      request.setHeader('User-Agent', 'OpenCanvas');
+
+      request.on('response', (response) => {
+        console.log(`[Update] GitHub API Response: ${response.statusCode}`);
+        let body = '';
+        response.on('data', (chunk) => { body += chunk; });
+        response.on('end', () => {
+          try {
+            if (response.statusCode === 200) {
+              const data = JSON.parse(body);
+              const latestVersion = data.tag_name?.replace('v', '');
+              console.log(`[Update] Latest version on GitHub: ${latestVersion}`);
+
+              if (latestVersion && latestVersion !== currentVersion) {
+                console.log(`[Update] Update available! Sending event to UI.`);
+                ipcContext.mainWindow?.webContents.send('update-available', {
+                  source: 'manual',
+                  version: latestVersion,
+                  url: data.html_url
+                });
+              } else {
+                console.log(`[Update] App is up to date.`);
+              }
+            } else {
+              console.error(`[Update] Failed to check updates. Status: ${response.statusCode}`);
+            }
+          } catch (e) {
+            console.error('[Update] Failed to parse GitHub release', e);
+          }
+        });
+      });
+      request.on('error', (error) => {
+        console.error('[Update] Network error checking updates:', error);
+      });
+      request.end();
+    }, 3000); // 3 second delay
+  }
 }
+
+// Add Handler for Manual Download
+ipcMain.handle('download-update-manual', async () => {
+  await shell.openExternal('https://github.com/Gyana491/OpenCanvas/releases/latest');
+});
 
 async function setupORPC() {
   const { rpcHandler } = await import("./ipc/handler");

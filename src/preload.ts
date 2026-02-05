@@ -38,4 +38,10 @@ contextBridge.exposeInMainWorld('electron', {
   duplicateWorkflow: (id: string) => ipcRenderer.invoke('workflow:duplicate', id),
 
   renameWorkflow: (id: string, name: string) => ipcRenderer.invoke('workflow:rename', id, name),
+
+  // Update API
+  onUpdateAvailable: (callback: (info: any) => void) => ipcRenderer.on('update-available', (_, info) => callback(info)),
+  onUpdateDownloaded: (callback: (info: any) => void) => ipcRenderer.on('update-downloaded', (_, info) => callback(info)),
+  onUpdateError: (callback: (error: any) => void) => ipcRenderer.on('update-error', (_, error) => callback(error)),
+  downloadUpdateManual: () => ipcRenderer.invoke('download-update-manual'),
 });

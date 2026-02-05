@@ -1,7 +1,7 @@
 {
   "name": "opencanvas",
   "productName": "OpenCanvas",
-  "version": "1.0.2",
+  "version": "1.0.0",
   "description": "OpenCanvas Desktop Application",
   "main": ".vite/build/main.js",
   "private": true,

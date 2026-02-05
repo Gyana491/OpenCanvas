@@ -49,6 +49,7 @@ import {
 import { useEffect, useState } from "react"
 import { formatDistanceToNow } from "date-fns"
 import { toast } from "sonner"
+import { useAutoUpdate } from "@/hooks/use-auto-update"
 
 export const Route = createFileRoute("/")({
   component: DashboardPage,
@@ -62,6 +63,7 @@ interface WorkflowCardData {
 }
 
 function DashboardPage() {
+  useAutoUpdate() // Initialise update checker
   const navigate = useNavigate()
   const [workflows, setWorkflows] = useState<WorkflowCardData[]>([])
   const [isLoading, setIsLoading] = useState(true)

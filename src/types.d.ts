@@ -105,6 +105,12 @@ declare global {
                 success: boolean
                 error?: string
             }>
+
+            // Update API
+            onUpdateAvailable: (callback: (info: any) => void) => void
+            onUpdateDownloaded: (callback: (info: any) => void) => void
+            onUpdateError: (callback: (error: any) => void) => void
+            downloadUpdateManual: () => Promise<void>
         }
     }
 }
