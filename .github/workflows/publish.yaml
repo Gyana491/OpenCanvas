@@ -5,7 +5,10 @@ on:
 
 jobs:
   publish-release:
-    runs-on: windows-latest
+    strategy:
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     permissions:
       contents: write
     steps:
@@ -21,7 +24,14 @@ jobs:
       - name: Install and build
         run: npm ci
 
-      - name: Publish Release
+      - name: Publish Release (Windows)
+        if: matrix.os == 'windows-latest'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npm run publish
+        run: npm run publish -- --platform=win32
+
+      - name: Publish Release (macOS)
+        if: matrix.os == 'macos-latest'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run publish -- --platform=darwin --arch=arm64,x64
