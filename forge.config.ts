@@ -11,11 +11,7 @@ import { FuseV1Options, FuseVersion } from "@electron/fuses";
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
-    executableName: "OpenCanvas", // Fix Linux build error
-    // Support both Intel and Apple Silicon for macOS
-    ...(process.platform === 'darwin' && process.env.ARCH === 'universal'
-      ? { arch: 'universal' as const }
-      : {}),
+    executableName: "opencanvas",
   },
   rebuildConfig: {},
   makers: [
