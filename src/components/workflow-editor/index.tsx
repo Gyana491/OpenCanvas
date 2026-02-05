@@ -253,7 +253,7 @@ function WorkflowEditorInner() {
   const [isEditingName, setIsEditingName] = useState(false)
   const [newName, setNewName] = useState("")
   const [workflowName, setWorkflowName] = useState("")
-  const [shouldGenerateThumbnail, setShouldGenerateThumbnail] = useState(false)
+
 
   // Auto-save timer ref
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null)
@@ -308,8 +308,6 @@ function WorkflowEditorInner() {
             if (viewport) {
               setViewport(viewport, { duration: 0 })
             }
-            // Trigger thumbnail generation for newly loaded workflows
-            setShouldGenerateThumbnail(true)
           } else {
             console.error('[Workflow Editor] Failed to load workflow:', response.error)
             // If workflow doesn't exist, redirect to home
@@ -420,32 +418,7 @@ function WorkflowEditorInner() {
   }, [nodes, edges, currentWorkflowId, isLoading, getViewport, getSerializableGraph])
 
 
-  // Generate thumbnail after workflow loads (for imported workflows)
-  useEffect(() => {
-    if (!shouldGenerateThumbnail || !currentWorkflowId || !window.electron || nodes.length === 0) {
-      return
-    }
 
-    // Wait a bit for the canvas to render
-    const timer = setTimeout(async () => {
-      try {
-        const viewport = getViewport()
-        const { nodes: safeNodes, edges: safeEdges } = getSerializableGraph(nodes, edges)
-        const thumbnailBuffer = await generateThumbnail()
-
-        if (thumbnailBuffer) {
-          await window.electron.saveWorkflow(currentWorkflowId, safeNodes, safeEdges, viewport, thumbnailBuffer)
-          console.log('[Workflow Editor] Generated thumbnail for imported workflow:', currentWorkflowId)
-        }
-      } catch (error) {
-        console.error('[Workflow Editor] Failed to generate thumbnail after load:', error)
-      } finally {
-        setShouldGenerateThumbnail(false)
-      }
-    }, 1000) // Wait 1 second for canvas to render
-
-    return () => clearTimeout(timer)
-  }, [shouldGenerateThumbnail, currentWorkflowId, nodes, edges, getViewport, getSerializableGraph, generateThumbnail])
 
   const toggleAnimation = useCallback(() => {
     setIsAnimated((prev) => !prev)
