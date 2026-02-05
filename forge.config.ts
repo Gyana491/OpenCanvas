@@ -11,6 +11,7 @@ import { FuseV1Options, FuseVersion } from "@electron/fuses";
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
+    executableName: "OpenCanvas", // Fix Linux build error
     // Support both Intel and Apple Silicon for macOS
     ...(process.platform === 'darwin' && process.env.ARCH === 'universal'
       ? { arch: 'universal' as const }
@@ -32,8 +33,8 @@ const config: ForgeConfig = {
   publishers: [
     {
       /*
-       * Publish release on GitHub as draft.
-       * Remember to manually publish it on GitHub website after verifying everything is correct.
+       * Publish release on GitHub with update feeds for auto-updates.
+       * Apps will automatically check for updates and notify users.
        */
       name: "@electron-forge/publisher-github",
       config: {
@@ -43,6 +44,8 @@ const config: ForgeConfig = {
         },
         draft: true,
         prerelease: false,
+        // Generate update manifest for auto-updates
+        generateReleaseNotes: true,
       },
     },
   ],
