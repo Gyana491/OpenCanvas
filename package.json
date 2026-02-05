@@ -14,7 +14,7 @@
     "make:all": "npm run make:win && npm run make:mac",
     "publish": "electron-forge publish",
     "release": "npm run release:tag && echo '✅ Tag pushed! GitHub Actions will build the release.'",
-    "release:tag": "git tag v$(node -p \"require('./package.json').version\") 2>/dev/null || true && git push origin v$(node -p \"require('./package.json').version\")",
+    "release:tag": "git push origin v$(node -p \"require('./package.json').version\") && git push origin HEAD",
     "version:patch": "npm version patch && npm run release",
     "version:minor": "npm version minor && npm run release",
     "version:major": "npm version major && npm run release",
