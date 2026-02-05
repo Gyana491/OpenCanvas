@@ -16,15 +16,14 @@ export function useAutoUpdate() {
             console.log('Update available:', info);
 
             if (info.source === 'manual') {
-                toast.info(`New version ${info.version} available!`, {
-                    description: "A new version of OpenCanvas is ready.",
+                toast.info(`Version ${info.version} is now available!`, {
                     action: {
                         label: "Update now",
                         onClick: () => window.electron.downloadUpdateManual()
                     },
                     cancel: {
                         label: "Later",
-                        onClick: () => console.log("Update dismissed")
+                        onClick: () => { }
                     },
                     duration: Infinity, // Keep open until user interacts
                 });
