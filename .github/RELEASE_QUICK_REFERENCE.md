@@ -11,6 +11,9 @@ npm run version:minor
 
 # Breaking change (1.0.0 → 2.0.0)
 npm run version:major
+
+# Redo current release (Fix bug without bumping version)
+npm run release:redo
 ```
 
 ## ❓ When to Run These Commands?
@@ -60,11 +63,10 @@ git tag -d v1.0.1
 git push origin :refs/tags/v1.0.1
 ```
 
-### Build Failed
-1. Check GitHub Actions logs
-2. Fix the issue
-3. Delete tag (see above)
-4. Re-run release command
+3. Run the automated redo command:
+```bash
+npm run release:redo
+```
 
 ## Platform Artifacts
 

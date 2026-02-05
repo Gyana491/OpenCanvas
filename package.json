@@ -15,6 +15,7 @@
     "publish": "electron-forge publish",
     "release": "npm run release:tag && echo '✅ Tag pushed! GitHub Actions will build the release.'",
     "release:tag": "git push origin v$(node -p \"require('./package.json').version\") && git push origin HEAD",
+    "release:redo": "git tag -d v$(node -p \"require('./package.json').version\") && git push origin :refs/tags/v$(node -p \"require('./package.json').version\") && git tag v$(node -p \"require('./package.json').version\") && npm run release",
     "version:patch": "npm version patch && npm run release",
     "version:minor": "npm version minor && npm run release",
     "version:major": "npm version major && npm run release",
