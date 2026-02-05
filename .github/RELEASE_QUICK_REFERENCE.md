@@ -13,6 +13,13 @@ npm run version:minor
 npm run version:major
 ```
 
+## ❓ When to Run These Commands?
+
+**Only when you are ready to ship to users!**
+
+- **Daily Work:** Use `git commit` and `git push` normally.
+- **Ready to Publish:** Run `npm run version:x` ONE time to build and release.
+
 ## What Happens Automatically
 
 1. ✅ Updates `package.json` version
