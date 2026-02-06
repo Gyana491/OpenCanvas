@@ -13,6 +13,10 @@ const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
     executableName: "opencanvas",
+    osxSign: {
+      identity: "ad-hoc",
+      preAutoEntitlements: false,
+    },
   },
   rebuildConfig: {},
   makers: [

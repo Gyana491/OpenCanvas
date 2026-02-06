@@ -25,6 +25,17 @@ Create art, generate videos, write content, analyze images, or build something e
 - **Hobbyists** who love exploring what AI can do
 - **Anyone** curious about AI and wants an easy way to get started
 
+## Installation on macOS (Hackathon Build)
+
+Because this app is not distributed via the App Store, you may see a security warning.
+
+1.  Download the **.zip** file.
+2.  Extract it.
+3.  **Right-click** `OpenCanvas.app` and select **Open**.
+4.  Click **Open** in the dialog box.
+
+> **Note:** If you double-click normally, you may see an "Unidentified Developer" or "Damaged" error. Using **Right-Click -> Open** is the required bypass.
+
 ## Getting Started
 
 Simply download Open Canvas, connect your AI models, and start creating. No complicated setup, no technical knowledge needed—just your creativity and the AI models of your choice.
