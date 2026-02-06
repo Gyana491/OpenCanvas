@@ -16,6 +16,8 @@ const config: ForgeConfig = {
     osxSign: {
       identity: "ad-hoc",
       preAutoEntitlements: false,
+      // @ts-expect-error: hardenedRuntime is valid in electron-osx-sign but missing in types
+      hardenedRuntime: false,
     },
   },
   rebuildConfig: {},
